@@ -9,7 +9,8 @@ b = 0.5
 
 # 环境参数
 NUM_TASK_TYPES = 3  # 任务类型数量
-NUM_VMS_PER_TYPE = 3  # 每种任务类型有3台虚拟机
+NUM_VMS_PER_TYPE = 3 # 每种任务类型有3台虚拟机 
+# NUM_VMS_PER_TYPE = [3,3,3]  # 每种任务类型有3台虚拟机
 TASK_CONFIG = {  # 任务类型预定义参数  需求10%是为了使得离散值都能覆盖到
     0: {"demand": 10, "duration": 5},  # 类型0: 需求10%，持续5步长
     1: {"demand": 10, "duration": 6},  # 类型1: 需求10%，持续6步长
