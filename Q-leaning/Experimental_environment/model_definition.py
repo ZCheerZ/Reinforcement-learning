@@ -8,35 +8,36 @@ a = 0.4
 b = 0.5
 
 # 环境参数
-NUM_TASK_TYPES = 3  # 任务类型数量
-NUM_VMS_PER_TYPE = 3 # 每种任务类型有3台虚拟机 
-# NUM_VMS_PER_TYPE = [3,3,3]  # 每种任务类型有3台虚拟机
-TASK_CONFIG = {  # 任务类型预定义参数  需求10%是为了使得离散值都能覆盖到
-    0: {"demand": 10, "duration": 5},  # 类型0: 需求10%，持续5步长
-    1: {"demand": 10, "duration": 6},  # 类型1: 需求10%，持续6步长
+NUM_TASK_TYPES = 3  # 应用类型数量
+NUM_VMS_PER_TYPE = [3,3,3]  # 每种应用类型有3台虚拟机
+VMS_PER_TYPE = [0,0,0,1,1,1,2,2,2]  # 每台虚拟机到应用类型的映射
+NUM_PM = 3  # 实体机数量
+TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为了使得离散值都能覆盖到
+    0: {"demand": 10, "duration": 8},  # 类型0: 需求10%，持续8步长
+    1: {"demand": 10, "duration": 9},  # 类型1: 需求10%，持续9步长
     2: {"demand": 10, "duration": 7},  # 类型2: 需求10%，持续7步长
 }
-VM_CAPACITY = 100  # 虚拟机容量（100%）
-ENTITY_CAPACITY = 200  # 实体机容量（200%）
+VM_CAPACITY = [100,120,150]  # 虚拟机容量，执行不同应用类型任务的虚拟机资源容量
+ENTITY_CAPACITY = 300  # 实体机容量（300%）
+
 
 class CloudEnv:
     def __init__(self):
         # 虚拟机负载（百分比），格式：{虚拟机ID: 当前总负载}
-        self.vm_load = np.zeros(NUM_TASK_TYPES * NUM_VMS_PER_TYPE, dtype=float)
-        # self.vm_load = np.zeros(sum(NUM_VMS_PER_TYPE), dtype=float)
+        self.vm_load = np.zeros(sum(NUM_VMS_PER_TYPE), dtype=float)
         
-        # 虚拟机到实体机的映射（假设虚拟机i部署在实体机i%3）
-        self.vm_to_entity = [i % NUM_VMS_PER_TYPE for i in range(NUM_TASK_TYPES * NUM_VMS_PER_TYPE)]
+        # 虚拟机到实体机的映射
+        self.vm_to_entity = [0,1,2,0,1,2,0,1,2]  # 假设虚拟机i平铺部署在实体机上
         
         # 任务队列：记录每个虚拟机中正在执行的任务（剩余步长, 负载）
-        self.task_queues = [deque() for _ in range(NUM_TASK_TYPES * NUM_VMS_PER_TYPE)]
-        # self.task_queues = [deque() for _ in range(sum(NUM_VMS_PER_TYPE))]
+        self.task_queues = [deque() for _ in range(sum(NUM_VMS_PER_TYPE))]
         
-    def _get_vm_level(self, load):
+    def _get_vm_level(self, load, vm_type):
+        rate = load / VM_CAPACITY[vm_type] *100  # 获取对应虚拟机的容量比率
         # 将负载百分比转换为离散等级（1/2/3.../10）
-        if load < 30:
+        if rate < 30:
             return 1
-        elif 30 <= load < 60:
+        elif 30 <= rate < 60:
             return 2
         else:
             return 3
@@ -58,9 +59,9 @@ class CloudEnv:
         #     return 10
         
     def get_state(self, task_type):
-        #  构建状态：任务类型 + 所有虚拟机负载等级 所有虚拟机的负载等级（按任务类型分组）
-        vm_levels = [self._get_vm_level(self.vm_load[i]) 
-                    for i in range(NUM_TASK_TYPES * NUM_VMS_PER_TYPE)]
+        #  构建状态：应用类型 + 所有虚拟机负载等级 所有虚拟机的负载等级（按应用类型分组）
+        vm_levels = [self._get_vm_level(self.vm_load[i], VMS_PER_TYPE[i]) 
+                    for i in range(sum(NUM_VMS_PER_TYPE))]
         return (task_type,) + tuple(vm_levels)
     
     def get_all_states(self):
@@ -73,7 +74,7 @@ class CloudEnv:
         vm_level_range = list(range(1, 4))  # 1~4
         for task_type in range(NUM_TASK_TYPES):
             # 9台虚拟机，每台有4种level
-            for vm_levels in itertools.product(vm_level_range, repeat=NUM_TASK_TYPES * NUM_VMS_PER_TYPE):
+            for vm_levels in itertools.product(vm_level_range, repeat=sum(NUM_VMS_PER_TYPE)):
                 state = (task_type,) + vm_levels
                 all_states.append(state)
         return all_states
@@ -84,10 +85,18 @@ class CloudEnv:
         state: (task_type, vm_level_0, ..., vm_level_8)
         """
         # 只设置虚拟机负载，task_type不需要设置
-        for i in range(NUM_TASK_TYPES * NUM_VMS_PER_TYPE):
-            # 反推负载百分比区间的下界
+        for i in range(sum(NUM_VMS_PER_TYPE)):
+            # 反推负载百分比区间的均值
+            vm_type = VMS_PER_TYPE[i]
             level = state[i + 1]
-            self.vm_load[i] = (level - 1) * 10  # 例如level=3, 负载=20
+            # 反推百分比区间的中值
+            if level == 1:
+                percent = 15  # (0+30)/2
+            elif level == 2:
+                percent = 45  # (30+60)/2
+            else:  # level == 3
+                percent = 80  # (60+100)/2，假设最大100%
+            self.vm_load[i] = percent / 100 * VM_CAPACITY[vm_type]
         # 清空任务队列（注意：此处未恢复任务队列，仅用于Q表学习）
         for q in self.task_queues:
             q.clear()
@@ -96,7 +105,7 @@ class CloudEnv:
         #  执行动作：分配任务到虚拟机，并处理任务队列
         #  处理任务队列（减少剩余步长）
         released_load = 0
-        for vm in range(NUM_TASK_TYPES * NUM_VMS_PER_TYPE):
+        for vm in range(sum(NUM_VMS_PER_TYPE)):
             new_queue = deque()
             while self.task_queues[vm]:
                 remain_steps, load = self.task_queues[vm].popleft()
@@ -113,7 +122,7 @@ class CloudEnv:
         task_duration = TASK_CONFIG[task_type]["duration"]
         
         # 检查虚拟机容量是否足够
-        if self.vm_load[vm_id] + task_demand > VM_CAPACITY:
+        if self.vm_load[vm_id] + task_demand > VM_CAPACITY[VMS_PER_TYPE[vm_id]]:
             reward = -10  # 直接拒绝任务的惩罚
             return reward, False
         
@@ -123,16 +132,16 @@ class CloudEnv:
 
         # 计算奖励
         # 同类型虚拟机的负载方差
-        same_type_vms = [self.vm_load[i] for i in range(NUM_TASK_TYPES * NUM_VMS_PER_TYPE)
-                       if i // NUM_VMS_PER_TYPE == task_type]
+        same_type_vms = [self.vm_load[i] for i in range(sum(NUM_VMS_PER_TYPE))
+                       if VMS_PER_TYPE[i] == task_type]
         vm_var = np.var(same_type_vms)
         
         # 实体机负载方差
         entity_loads = []
-        for e in range(NUM_VMS_PER_TYPE):  # 实体机数量
+        for e in range(NUM_PM):  # 实体机数量
             load = sum(
                 self.vm_load[i] 
-                for i in range(NUM_TASK_TYPES * NUM_VMS_PER_TYPE)
+                for i in range(sum(NUM_VMS_PER_TYPE))
                 if self.vm_to_entity[i] == e
             )
             entity_loads.append(load)
@@ -151,8 +160,8 @@ class CloudEnv:
 
 class QLearningAgent:
     def __init__(self):
-        # Q表：状态 -> 每个动作的Q值（动作空间为3，每个任务类型只能选对应3个虚拟机）
-        self.q_table = defaultdict(lambda: np.full(NUM_VMS_PER_TYPE,-10000.0))
+        # Q表：状态 -> 每个动作的Q值（动作空间为3，每个应用类型只能选对应3个虚拟机）
+        self.q_table = defaultdict(lambda: np.full(max(NUM_VMS_PER_TYPE),-10000.0))
     
     def choose_action(self, state, available_actions):
         if random.random() < EPSILON:
