@@ -21,6 +21,7 @@ def load_agent_from_file(q_table_path="Q-leaning/q_table.pkl"):
     # agent.q_table = loaded_q_table
     agent.q_table = defaultdict(lambda: np.zeros(NUM_VMS_PER_TYPE), loaded_q_table)
     print("Q表已从文件加载")
+    print("agent.q_table:", agent.q_table[(0, 2, 1, 2, 1, 2, 2, 2, 2, 1)])  # 测试加载的Q表
     return agent
 
 def evaluate_with_same_tasks(agent, episodes=500):
@@ -50,18 +51,18 @@ def evaluate_with_same_tasks(agent, episodes=500):
             # 下一个任务
             next_task_type = all_task_types[ep][t] if t+1 >= MAX_STEPS else all_task_types[ep][t+1]
             state = env_q.get_state(next_task_type)
-        # 记录方差
-        vm_var_q.append(np.var(env_q.vm_load))
-        # print("env_q.vm_load:", env_q.vm_load)
-        entity_loads = []
-        for e in range(NUM_VMS_PER_TYPE):
-            load = sum(
-                env_q.vm_load[i]
-                for i in range(NUM_TASK_TYPES * NUM_VMS_PER_TYPE)
-                if env_q.vm_to_entity[i] == e
-            )
-            entity_loads.append(load)
-        entity_var_q.append(np.var(entity_loads))
+            # 记录方差
+            vm_var_q.append(np.var(env_q.vm_load))
+            print("env_q.vm_load:", env_q.vm_load)
+            entity_loads = []
+            for e in range(NUM_VMS_PER_TYPE):
+                load = sum(
+                    env_q.vm_load[i]
+                    for i in range(NUM_TASK_TYPES * NUM_VMS_PER_TYPE)
+                    if env_q.vm_to_entity[i] == e
+                )
+                entity_loads.append(load)
+            entity_var_q.append(np.var(entity_loads))
 
     # 3. 随机分配评估（用同样的任务序列）
     env_r = CloudEnv()
@@ -127,7 +128,7 @@ def train_Q_learning_and_evaluate():
     agent = load_agent_from_file()
 
     # 用同一任务序列评估
-    vm_var_q, entity_var_q, vm_var_random, entity_var_random, vm_var_rr, entity_var_rr = evaluate_with_same_tasks(agent, episodes=300)
+    vm_var_q, entity_var_q, vm_var_random, entity_var_random, vm_var_rr, entity_var_rr = evaluate_with_same_tasks(agent, episodes=1)
 
     # 计算平均方差
     avg_vm_var_q = np.mean(vm_var_q)
