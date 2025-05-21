@@ -7,7 +7,7 @@ from model_definition import CloudEnv, QLearningAgent
 # 超参数
 LEARNING_RATE = 0.1
 DISCOUNT_FACTOR = 0.95
-EPISODES = 2000
+EPISODES = 1200
 MAX_STEPS = 500
 
 # 环境参数
@@ -71,7 +71,7 @@ def train_Q_learning():
 
     # 保存Q表
     q_table_to_save = dict(agent.q_table)
-    with open("q_table.pkl", "wb") as f:
+    with open("Q-leaning/q_table.pkl", "wb") as f:
         pickle.dump(q_table_to_save, f)
     print("Q表已保存到 q_table.pkl")
 

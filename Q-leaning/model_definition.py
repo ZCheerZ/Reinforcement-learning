@@ -11,10 +11,10 @@ b = 0.5
 NUM_TASK_TYPES = 3  # 任务类型数量
 NUM_VMS_PER_TYPE = 3 # 每种任务类型有3台虚拟机 
 # NUM_VMS_PER_TYPE = [3,3,3]  # 每种任务类型有3台虚拟机
-TASK_CONFIG = {  # 任务类型预定义参数  需求10%是为了使得离散值都能覆盖到
-    0: {"demand": 10, "duration": 5},  # 类型0: 需求10%，持续5步长
-    1: {"demand": 10, "duration": 6},  # 类型1: 需求10%，持续6步长
-    2: {"demand": 10, "duration": 7},  # 类型2: 需求10%，持续7步长
+TASK_CONFIG = {  # 任务类型预定义参数  需求30%是为了使得离散值都能覆盖到
+    0: {"demand": 30, "duration": 5},  # 类型0: 需求10%，持续5步长
+    1: {"demand": 30, "duration": 6},  # 类型1: 需求10%，持续6步长
+    2: {"demand": 30, "duration": 7},  # 类型2: 需求10%，持续7步长
 }
 VM_CAPACITY = 100  # 虚拟机容量（100%）
 ENTITY_CAPACITY = 200  # 实体机容量（200%）
@@ -32,7 +32,7 @@ class CloudEnv:
         self.task_queues = [deque() for _ in range(NUM_TASK_TYPES * NUM_VMS_PER_TYPE)]
         # self.task_queues = [deque() for _ in range(sum(NUM_VMS_PER_TYPE))]
         
-    def _get_vm_level(self, load):
+    def _get_vm_level(self, load): #离散等级要尽可能细  不然会造成 如load < 30内的负载不均衡 因为它会根据离散等级1的Q表从而分配给一个虚拟机
         # 将负载百分比转换为离散等级（1/2/3.../10）
         if load < 30:
             return 1
@@ -85,9 +85,15 @@ class CloudEnv:
         """
         # 只设置虚拟机负载，task_type不需要设置
         for i in range(NUM_TASK_TYPES * NUM_VMS_PER_TYPE):
-            # 反推负载百分比区间的下界
             level = state[i + 1]
-            self.vm_load[i] = (level - 1) * 10  # 例如level=3, 负载=20
+            # 反推百分比区间的中值
+            if level == 1:
+                percent = 15   # (0+30)/2
+            elif level == 2:
+                percent = 45   # (30+60)/2
+            else:  # level == 3
+                percent = 80   # (60+100)/2，假设最大100%
+            self.vm_load[i] = percent / 100 * VM_CAPACITY
         # 清空任务队列（注意：此处未恢复任务队列，仅用于Q表学习）
         for q in self.task_queues:
             q.clear()
@@ -154,7 +160,7 @@ class QLearningAgent:
         # Q表：状态 -> 每个动作的Q值（动作空间为3，每个任务类型只能选对应3个虚拟机）
         self.q_table = defaultdict(lambda: np.full(NUM_VMS_PER_TYPE,-10000.0))
     
-    def choose_action(self, state, available_actions):
+    def choose_action(self, state, available_actions , EPSILON=EPSILON):
         if random.random() < EPSILON:
             return random.choice(available_actions)
         else:

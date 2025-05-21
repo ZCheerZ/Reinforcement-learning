@@ -23,7 +23,7 @@ def load_agent_from_file(q_table_path="Q-leaning/q_table.pkl"):
     print("Q表已从文件加载")
     return agent
 
-def evaluate_with_same_tasks(agent, episodes=100):
+def evaluate_with_same_tasks(agent, episodes=500):
     """
     用同一批任务序列分别评估Q-learning、随机分配和轮询分配的负载均衡效果
     :param agent: 已训练好的 QLearningAgent
@@ -35,7 +35,7 @@ def evaluate_with_same_tasks(agent, episodes=100):
     for _ in range(episodes):
         task_types = [random.randint(0, NUM_TASK_TYPES-1) for _ in range(MAX_STEPS)]
         all_task_types.append(task_types)
-
+    print("生成的第一轮任务序列：", all_task_types[0])
     # 2. Q-learning评估
     env_q = CloudEnv()
     vm_var_q, entity_var_q = [], []
@@ -45,13 +45,14 @@ def evaluate_with_same_tasks(agent, episodes=100):
         for t in range(MAX_STEPS):
             task_type = all_task_types[ep][t]
             available_actions = list(range(NUM_VMS_PER_TYPE))
-            action = agent.choose_action(state, available_actions)
+            action = agent.choose_action(state, available_actions, EPSILON=0)
             env_q.step(task_type, task_type * NUM_VMS_PER_TYPE + action)
             # 下一个任务
             next_task_type = all_task_types[ep][t] if t+1 >= MAX_STEPS else all_task_types[ep][t+1]
             state = env_q.get_state(next_task_type)
         # 记录方差
         vm_var_q.append(np.var(env_q.vm_load))
+        # print("env_q.vm_load:", env_q.vm_load)
         entity_loads = []
         for e in range(NUM_VMS_PER_TYPE):
             load = sum(
@@ -78,7 +79,7 @@ def evaluate_with_same_tasks(agent, episodes=100):
             state = env_r.get_state(next_task_type)
         # 记录方差
         vm_var_random.append(np.var(env_r.vm_load))
-        
+        # print("env_r.vm_load:", env_r.vm_load)
         entity_loads = []
         for e in range(NUM_VMS_PER_TYPE):
             load = sum(
@@ -106,9 +107,10 @@ def evaluate_with_same_tasks(agent, episodes=100):
             # 下一个任务
             next_task_type = all_task_types[ep][t] if t+1 >= MAX_STEPS else all_task_types[ep][t+1]
             state = env_rr.get_state(next_task_type)
-        # 记录方差
-        vm_var_rr.append(np.var(env_rr.vm_load))
+        # 记录方差   虚拟机方差应该是同类型的  然后不同类型的求其平均
+        vm_var_rr.append(np.var(env_rr.vm_load)) 
         entity_loads = []
+        # print("env_rr.vm_load:", env_rr.vm_load)
         for e in range(NUM_VMS_PER_TYPE):
             load = sum(
                 env_rr.vm_load[i]
@@ -125,7 +127,7 @@ def train_Q_learning_and_evaluate():
     agent = load_agent_from_file()
 
     # 用同一任务序列评估
-    vm_var_q, entity_var_q, vm_var_random, entity_var_random, vm_var_rr, entity_var_rr = evaluate_with_same_tasks(agent, episodes=500)
+    vm_var_q, entity_var_q, vm_var_random, entity_var_random, vm_var_rr, entity_var_rr = evaluate_with_same_tasks(agent, episodes=300)
 
     # 计算平均方差
     avg_vm_var_q = np.mean(vm_var_q)
