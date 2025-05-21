@@ -6,7 +6,7 @@ from model_definition import CloudEnv, QLearningAgent
 # 超参数
 LEARNING_RATE = 0.1
 DISCOUNT_FACTOR = 0.95
-EPISODES = 2000
+EPISODES = 10
 MAX_STEPS = 500
 
 # 环境参数
