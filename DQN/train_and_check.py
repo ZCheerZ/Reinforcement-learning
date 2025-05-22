@@ -4,10 +4,12 @@ import matplotlib.pyplot as plt  # 用于绘图
 from model_definition import CloudEnv, QLearningAgent
 
 # 超参数
+EPSILON_DECAY = 0.995
+MIN_EPSILON = 0.01
+EPISODES = 10000
+MAX_STEPS = 4000
 LEARNING_RATE = 0.1
-DISCOUNT_FACTOR = 0.95
-EPISODES = 50000
-MAX_STEPS = 500
+DISCOUNT_FACTOR = 0.9
 
 # 环境参数
 NUM_TASK_TYPES = 3
