@@ -39,7 +39,7 @@ def evaluate_with_same_tasks(agent, episodes=500):
     print("生成的第一轮任务序列：", all_task_types[0])
     # 2. Q-learning评估
     env_q = CloudEnv()
-    vm_var_q, entity_var_q = [], []
+    vm_var_q, entity_var_q = [[],[],[]], []
     for ep in range(episodes):
         env_q.reset()
         state = env_q.get_state(all_task_types[ep][0])
@@ -51,22 +51,26 @@ def evaluate_with_same_tasks(agent, episodes=500):
             # 下一个任务
             next_task_type = all_task_types[ep][t] if t+1 >= MAX_STEPS else all_task_types[ep][t+1]
             state = env_q.get_state(next_task_type)
-            # 记录方差
-            vm_var_q.append(np.var(env_q.vm_load))
-            print("env_q.vm_load:", env_q.vm_load)
-            entity_loads = []
-            for e in range(NUM_VMS_PER_TYPE):
-                load = sum(
-                    env_q.vm_load[i]
-                    for i in range(NUM_TASK_TYPES * NUM_VMS_PER_TYPE)
-                    if env_q.vm_to_entity[i] == e
-                )
-                entity_loads.append(load)
-            entity_var_q.append(np.var(entity_loads))
+        # 记录每种类型虚拟机的负载方差
+        for task_type in range(NUM_TASK_TYPES):
+            start = task_type * NUM_VMS_PER_TYPE
+            end = (task_type + 1) * NUM_VMS_PER_TYPE
+            vm_var_q[task_type].append(np.var(env_q.vm_load[start:end]))
+        print("env_q.vm_load:", env_q.vm_load)
+        # 记录实体机方差
+        entity_loads = []
+        for e in range(NUM_VMS_PER_TYPE):
+            load = sum(
+                env_q.vm_load[i]
+                for i in range(NUM_TASK_TYPES * NUM_VMS_PER_TYPE)
+                if env_q.vm_to_entity[i] == e
+            )
+            entity_loads.append(load)
+        entity_var_q.append(np.var(entity_loads))
 
     # 3. 随机分配评估（用同样的任务序列）
     env_r = CloudEnv()
-    vm_var_random, entity_var_random = [], []
+    vm_var_random, entity_var_random = [[],[],[]], []
     for ep in range(episodes):
         env_r.reset()
         state = env_r.get_state(all_task_types[ep][0])
@@ -78,7 +82,13 @@ def evaluate_with_same_tasks(agent, episodes=500):
             # 下一个任务
             next_task_type = all_task_types[ep][t] if t+1 >= MAX_STEPS else all_task_types[ep][t+1]
             state = env_r.get_state(next_task_type)
-        # 记录方差
+        # 记录每种类型虚拟机的负载方差
+        for task_type in range(NUM_TASK_TYPES):
+            start = task_type * NUM_VMS_PER_TYPE
+            end = (task_type + 1) * NUM_VMS_PER_TYPE
+            vm_var_random[task_type].append(np.var(env_r.vm_load[start:end]))
+
+        # 记录实体机方差
         vm_var_random.append(np.var(env_r.vm_load))
         # print("env_r.vm_load:", env_r.vm_load)
         entity_loads = []
@@ -93,7 +103,7 @@ def evaluate_with_same_tasks(agent, episodes=500):
 
     # 4. 轮询分配评估（用同样的任务序列）
     env_rr = CloudEnv()
-    vm_var_rr, entity_var_rr = [], []
+    vm_var_rr, entity_var_rr = [[],[],[]], []
     rr_pointer = [0 for _ in range(NUM_TASK_TYPES)]  # 每种任务类型一个指针
     for ep in range(episodes):
         env_rr.reset()
@@ -109,7 +119,12 @@ def evaluate_with_same_tasks(agent, episodes=500):
             next_task_type = all_task_types[ep][t] if t+1 >= MAX_STEPS else all_task_types[ep][t+1]
             state = env_rr.get_state(next_task_type)
         # 记录方差   虚拟机方差应该是同类型的  然后不同类型的求其平均
-        vm_var_rr.append(np.var(env_rr.vm_load)) 
+        # 记录每种类型虚拟机的负载方差
+        for task_type in range(NUM_TASK_TYPES):
+            start = task_type * NUM_VMS_PER_TYPE
+            end = (task_type + 1) * NUM_VMS_PER_TYPE
+            vm_var_rr[task_type].append(np.var(env_rr.vm_load[start:end]))
+        # 记录实体机方差
         entity_loads = []
         # print("env_rr.vm_load:", env_rr.vm_load)
         for e in range(NUM_VMS_PER_TYPE):
@@ -128,47 +143,50 @@ def train_Q_learning_and_evaluate():
     agent = load_agent_from_file()
 
     # 用同一任务序列评估
-    vm_var_q, entity_var_q, vm_var_random, entity_var_random, vm_var_rr, entity_var_rr = evaluate_with_same_tasks(agent, episodes=1)
+    vm_var_q, entity_var_q, vm_var_random, entity_var_random, vm_var_rr, entity_var_rr = evaluate_with_same_tasks(agent, episodes=300)
 
-    # 计算平均方差
-    avg_vm_var_q = np.mean(vm_var_q)
-    avg_vm_var_random = np.mean(vm_var_random)
-    avg_vm_var_rr = np.mean(vm_var_rr)
+
+    # 计算每种类型虚拟机方差的均值
+    avg_vm_var_q = [np.mean(vm_var_q[i]) for i in range(NUM_TASK_TYPES)]
+    avg_vm_var_random = [np.mean(vm_var_random[i]) for i in range(NUM_TASK_TYPES)]
+    avg_vm_var_rr = [np.mean(vm_var_rr[i]) for i in range(NUM_TASK_TYPES)]
     avg_entity_var_q = np.mean(entity_var_q)
     avg_entity_var_random = np.mean(entity_var_random)
     avg_entity_var_rr = np.mean(entity_var_rr)
 
-    print("各算法虚拟机负载方差均值：")
-    print(f"Q-learning: {avg_vm_var_q:.4f}")
-    print(f"Random:    {avg_vm_var_random:.4f}")
-    print(f"RR:        {avg_vm_var_rr:.4f}")
-
+    print("各算法每种类型虚拟机负载方差均值：")
+    for i in range(NUM_TASK_TYPES):
+        print(f"Type {i} - Q-learning: {avg_vm_var_q[i]:.4f}, Random: {avg_vm_var_random[i]:.4f}, RR: {avg_vm_var_rr[i]:.4f}")
     print("各算法实体机负载方差均值：")
     print(f"Q-learning: {avg_entity_var_q:.4f}")
     print(f"Random:    {avg_entity_var_random:.4f}")
     print(f"RR:        {avg_entity_var_rr:.4f}")
 
     # 绘图
-    plt.figure(figsize=(12,5))
-    plt.subplot(2,1,1)
-    plt.plot(vm_var_q, label="Q-learning")
-    plt.plot(vm_var_random, label="Random")
-    plt.plot(vm_var_rr, label="RR")
-    plt.title("VM load variance")
+    plt.figure(figsize=(15,8))
+    # 虚拟机负载方差（每种类型单独画线）
+    for i in range(NUM_TASK_TYPES):
+        plt.subplot(2,2,i+1)
+        plt.plot(vm_var_q[i], label=f"Q-learning Type {i}")
+        plt.plot(vm_var_random[i], '--', label=f"Random Type {i}")
+        plt.plot(vm_var_rr[i], ':', label=f"RR Type {i}")
+        plt.title("VM load variance (per type)")
+        plt.xlabel("Episode")
+        plt.ylabel("Variance")
+        plt.legend()
+        plt.grid()
+
+    # 实体机负载方差
+    plt.subplot(2,2,4)
+    plt.plot(entity_var_q, label="Q-learning")
+    plt.plot(entity_var_random, label="Random")
+    plt.plot(entity_var_rr, label="RR")
+    plt.title("PM load variance")
     plt.xlabel("Episode")
     plt.ylabel("Variance")
     plt.legend()
     plt.grid()
 
-    plt.subplot(2,1,2)
-    plt.plot(entity_var_q, label="Q-learning")
-    plt.plot(entity_var_random, label="Random")
-    plt.plot(entity_var_rr, label="RR")
-    plt.title("PM load variance")  
-    plt.xlabel("Episode")
-    plt.ylabel("Variance")
-    plt.legend()
-    plt.grid()
 
     plt.tight_layout()
     plt.show()
