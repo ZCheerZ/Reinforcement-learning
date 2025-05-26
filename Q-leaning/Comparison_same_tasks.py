@@ -56,7 +56,7 @@ def evaluate_with_same_tasks(agent, episodes=500):
             start = task_type * NUM_VMS_PER_TYPE
             end = (task_type + 1) * NUM_VMS_PER_TYPE
             vm_var_q[task_type].append(np.var(env_q.vm_load[start:end]))
-        print("env_q.vm_load:", env_q.vm_load)
+        # print("env_q.vm_load:", env_q.vm_load)
         # 记录实体机方差
         entity_loads = []
         for e in range(NUM_VMS_PER_TYPE):

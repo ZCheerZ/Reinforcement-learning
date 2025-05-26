@@ -7,7 +7,7 @@ from model_definition import CloudEnv, QLearningAgent
 # 超参数
 LEARNING_RATE = 0.1
 DISCOUNT_FACTOR = 0.95
-EPISODES = 1200
+EPISODES = 1500
 MAX_STEPS = 500
 
 # 环境参数
@@ -39,7 +39,8 @@ def train_Q_learning():
                     # 执行动作并获取奖励
                     env.set_state(state)  # 你需要在CloudEnv中实现set_state方法，直接设置环境状态
                     reward, done = env.step(task_type, task_type * NUM_VMS_PER_TYPE + action)
-                    next_task_type = (task_type + 1) % NUM_TASK_TYPES  # 这里简单用下一个类型
+                    next_task_type = random.randint(0, NUM_TASK_TYPES-1)  # 使用随机类型 学习
+                    # next_task_type = (task_type + 1) % NUM_TASK_TYPES  # 这里简单用下一个类型
                     next_state = env.get_state(next_task_type)
 
                     # Q学习更新
