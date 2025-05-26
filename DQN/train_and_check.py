@@ -2,6 +2,7 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt  # 用于绘图
 import torch
+import pickle
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='TRUE'
 from model_definition import CloudEnv, DQNAgent
@@ -10,7 +11,7 @@ from model_definition import CloudEnv, DQNAgent
 EPSILON = 0.2
 EPSILON_DECAY = 0.995
 MIN_EPSILON = 0.01
-EPISODES = 100
+EPISODES = 1000
 MAX_STEPS = 300
 TARGET_UPDATE_FREQ = 100
 
@@ -73,8 +74,9 @@ def train_test():
         
 
     # 测试示例
-    test_task_type = 0
-    test_state = env.get_state(test_task_type)
+    # test_task_type = 0
+    # test_state = env.get_state(test_task_type)
+    test_state = (0, 2, 1, 2, 1, 2, 2, 2, 2, 1)
     test_state = np.array(test_state, dtype=np.float32)
     print(f"测试状态: {test_state}")
     print(f"测试动作值分布: {agent.policy_net(torch.FloatTensor(test_state).unsqueeze(0))}")
@@ -85,5 +87,9 @@ def train_test():
     plt.ylabel('Total Reward')
     plt.title('Training Progress')
     plt.show()
+
+    # 保存模型
+    torch.save(agent.policy_net.state_dict(), "DQN/policy_net.pth")
+
 
 train_test()
