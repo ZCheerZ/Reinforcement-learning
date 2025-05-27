@@ -2,7 +2,6 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt  # 用于绘图
 import torch
-import pickle
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='TRUE'
 from model_definition import CloudEnv, DQNAgent
@@ -12,7 +11,7 @@ EPSILON = 0.2
 EPSILON_DECAY = 0.995
 MIN_EPSILON = 0.01
 EPISODES = 1000
-MAX_STEPS = 300
+MAX_STEPS = 500
 TARGET_UPDATE_FREQ = 100
 
 # 环境参数

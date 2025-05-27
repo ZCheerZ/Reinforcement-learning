@@ -17,6 +17,7 @@ TARGET_UPDATE_FREQ = 100
 EPSILON = 0.3 # 探索率
 a = 0.4 
 b = 0.5
+overload = 5000
 
 # 环境参数
 NUM_TASK_TYPES = 3  # 应用类型数量
@@ -24,13 +25,21 @@ NUM_VMS_PER_TYPE = [3,3,3]  # 每种应用类型有3台虚拟机
 VMS_PER_TYPE = [0,0,0,1,1,1,2,2,2]  # 每台虚拟机到应用类型的映射
 NUM_PM = 3  # 实体机数量
 TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为了使得离散值都能覆盖到
-    0: {"demand": 10, "duration": 5},  # 类型0: 需求10%，持续8步长
-    1: {"demand": 10, "duration": 6},  # 类型1: 需求10%，持续9步长
-    2: {"demand": 10, "duration": 7},  # 类型2: 需求10%，持续7步长
+    0: {"demand": 10, "duration": 12},  # 类型0: 需求10%，持续8步长
+    1: {"demand": 10, "duration": 15},  # 类型1: 需求10%，持续9步长
+    2: {"demand": 10, "duration": 10},  # 类型2: 需求10%，持续7步长
 }
 VM_CAPACITY = [100,100,100]  # 虚拟机容量，执行不同应用类型任务的虚拟机资源容量
 ENTITY_CAPACITY = 200  # 实体机容量（300%）
 
+
+def prefix_sum(arr):
+    result = [0]
+    total = 0
+    for num in arr:
+        total += num
+        result.append(total)
+    return result
 
 class CloudEnv:
     def __init__(self):
@@ -42,6 +51,8 @@ class CloudEnv:
         
         # 任务队列：记录每个虚拟机中正在执行的任务（剩余步长, 负载）
         self.task_queues = [deque() for _ in range(sum(NUM_VMS_PER_TYPE))]
+
+        self.prefix_NUM_VMS_PER_TYPE = prefix_sum(NUM_VMS_PER_TYPE)
         
     def _get_vm_level(self, load, vm_type):
         rate = load / VM_CAPACITY[vm_type] *100  # 获取对应虚拟机的容量比率
@@ -126,7 +137,7 @@ class CloudEnv:
         
         # 检查虚拟机容量是否足够
         if self.vm_load[vm_id] + task_demand > VM_CAPACITY[VMS_PER_TYPE[vm_id]]:
-            reward = -10  # 直接拒绝任务的惩罚
+            reward = -1 * overload  # 直接拒绝任务的惩罚
             return reward, False
         
         # 更新虚拟机负载
@@ -151,7 +162,7 @@ class CloudEnv:
         entity_var = np.var(entity_loads)
         
         # 过载惩罚（任一实体机超载）
-        overload_penalty = 10 if any(l > ENTITY_CAPACITY for l in entity_loads) else 0
+        overload_penalty = overload if any(l > ENTITY_CAPACITY for l in entity_loads) else 0
         
         reward = -a * vm_var - b * entity_var - overload_penalty
         return reward, False
