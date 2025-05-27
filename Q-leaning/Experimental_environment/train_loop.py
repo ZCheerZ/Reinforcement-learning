@@ -48,8 +48,7 @@ def train_Q_learning():
                 for action in available_actions:
                     # 执行动作并获取奖励
                     env.set_state(state)
-                    prefix_NUM_VMS_PER_TYPE = prefix_sum(NUM_VMS_PER_TYPE)
-                    reward, done = env.step(task_type, prefix_NUM_VMS_PER_TYPE[task_type] + action)
+                    reward, done = env.step(task_type, env.prefix_NUM_VMS_PER_TYPE[task_type] + action)
                     next_task_type = (task_type + 1) % NUM_TASK_TYPES  # 这里简单用下一个类型  到时候可以使用随机类型
                     next_state = env.get_state(next_task_type)
 
