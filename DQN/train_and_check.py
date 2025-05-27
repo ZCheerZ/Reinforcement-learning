@@ -89,6 +89,7 @@ def train_test():
 
     # 保存模型
     torch.save(agent.policy_net.state_dict(), "DQN/policy_net.pth")
+    print("模型已保存到 DQN/policy_net.pth")
 
 
 train_test()
