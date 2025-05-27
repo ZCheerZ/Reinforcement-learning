@@ -153,21 +153,27 @@ def evaluate():
     avg_entity_var_q = np.mean(entity_var_q)
     avg_entity_var_random = np.mean(entity_var_random)
     avg_entity_var_rr = np.mean(entity_var_rr)
-
-    print("各算法每种类型虚拟机负载方差均值：")
+    print("--------------------------------------")
+    print("各算法每种应用类型虚拟机负载方差均值：")
     for i in range(NUM_TASK_TYPES):
-        print(f"Type {i} - Q-learning: {avg_vm_var_q[i]:.4f}, Random: {avg_vm_var_random[i]:.4f}, RR: {avg_vm_var_rr[i]:.4f}")
+        print(f"Type {i} - DQN: {avg_vm_var_q[i]:.4f}, Random: {avg_vm_var_random[i]:.4f}, RR: {avg_vm_var_rr[i]:.4f}")
+    print("--------------------------------------")
     print("各算法实体机负载方差均值：")
-    print(f"Q-learning: {avg_entity_var_q:.4f}")
+    print(f"DQN:       {avg_entity_var_q:.4f}")
     print(f"Random:    {avg_entity_var_random:.4f}")
     print(f"RR:        {avg_entity_var_rr:.4f}")
+    print("--------------------------------------")
+    print("多目标加权后各算法对比值：")
+    print(f"DQN:       {0.4*np.mean(vm_var_q) + 0.5*avg_entity_var_q:.4f}")
+    print(f"Random:    {0.4*np.mean(avg_vm_var_random) + 0.5*avg_entity_var_random:.4f}")
+    print(f"RR:        {0.4*np.mean(avg_vm_var_rr) + 0.5*avg_entity_var_rr:.4f}")
 
     # 绘图
     plt.figure(figsize=(15,8))
     # 虚拟机负载方差（每种类型单独画线）
     for i in range(NUM_TASK_TYPES):
         plt.subplot(2,2,i+1)
-        plt.plot(vm_var_q[i], label=f"Q-learning Type {i}")
+        plt.plot(vm_var_q[i], label=f"DQN Type {i}")
         plt.plot(vm_var_random[i], '--', label=f"Random Type {i}")
         plt.plot(vm_var_rr[i], ':', label=f"RR Type {i}")
         plt.title("VM load variance (per type)")
@@ -178,7 +184,7 @@ def evaluate():
 
     # 实体机负载方差
     plt.subplot(2,2,4)
-    plt.plot(entity_var_q, label="Q-learning")
+    plt.plot(entity_var_q, label="DQN")
     plt.plot(entity_var_random, label="Random")
     plt.plot(entity_var_rr, label="RR")
     plt.title("PM load variance")
