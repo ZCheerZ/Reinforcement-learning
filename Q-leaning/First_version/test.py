@@ -9,7 +9,7 @@ from collections import defaultdict
 NUM_TASK_TYPES = 3
 NUM_VMS_PER_TYPE = 3  # 每种任务类型有3台虚拟机
 
-def load_agent_from_file(q_table_path="Q-leaning/q_table.pkl"):
+def load_agent_from_file(q_table_path="Q-leaning/First_version/q_table.pkl"):
     agent = QLearningAgent()
     with open(q_table_path, "rb") as f:
         loaded_q_table = pickle.load(f)

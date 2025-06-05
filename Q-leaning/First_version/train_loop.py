@@ -72,7 +72,7 @@ def train_Q_learning():
 
     # 保存Q表
     q_table_to_save = dict(agent.q_table)
-    with open("Q-leaning/q_table.pkl", "wb") as f:
+    with open("Q-leaning/First_version/q_table.pkl", "wb") as f:
         pickle.dump(q_table_to_save, f)
     print("Q表已保存到 q_table.pkl")
 
