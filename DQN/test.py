@@ -7,13 +7,13 @@ from model_definition import CloudEnv, DQNAgent
 
 # 环境参数
 NUM_TASK_TYPES = 3  # 应用类型数量
-NUM_VMS_PER_TYPE = [3,3,3]  # 每种应用类型有3台虚拟机
+NUM_VMS_PER_TYPE = [2,4,3]  # 每种应用类型有3台虚拟机
 NUM_PM = 3  # 实体机数量
 
 
 
-def load_agent_from_file(policy_net_path="DQN/policy_net.pth"):
-    state_dim = 1 + NUM_TASK_TYPES * max(NUM_VMS_PER_TYPE)  # 状态维度
+def load_agent_from_file(policy_net_path="DQN/policy_net(243).pth"):
+    state_dim = 1 + sum(NUM_VMS_PER_TYPE)  # 状态维度
     action_dim = max(NUM_VMS_PER_TYPE)  # 动作维度
     agent = DQNAgent(state_dim, action_dim)
     agent.policy_net.load_state_dict(torch.load(policy_net_path,weights_only=True))
@@ -36,7 +36,7 @@ def evaluate_load_balance():
         test_state = np.array(test_state, dtype=np.int32)
         q_values = agent.policy_net(torch.FloatTensor(test_state).unsqueeze(0)).detach().numpy()[0]
         print(f"Q值分布: {q_values}")
-        best_action = np.argmax(q_values)
+        best_action = agent.choose_action_multi(test_state, 0)
         print(f"执行应用类型{test_state[0]}虚拟机中最大Q值对应动作: 选择{best_action}号虚拟机")
         vm_load = list(test_state[1:1 + env.prefix_NUM_VMS_PER_TYPE[-1]])
         vm_load[env.prefix_NUM_VMS_PER_TYPE[test_state[0]] + best_action] += 1

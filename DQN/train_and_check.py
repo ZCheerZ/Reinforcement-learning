@@ -4,26 +4,21 @@ import matplotlib.pyplot as plt  # 用于绘图
 import torch
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='TRUE'
-from model_definition import CloudEnv, DQNAgent
+from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYPE, VMS_PER_TYPE, NUM_PM
 
 # 超参数
 EPSILON = 0.2
 EPSILON_DECAY = 0.995
 MIN_EPSILON = 0.01
-EPISODES = 3000
-MAX_STEPS = 3000
+EPISODES = 500
+MAX_STEPS = 500
 TARGET_UPDATE_FREQ = 100
 
-# 环境参数
-NUM_TASK_TYPES = 3  # 应用类型数量
-NUM_VMS_PER_TYPE = [3,3,3]  # 每种应用类型有3台虚拟机
-VMS_PER_TYPE = [0,0,0,1,1,1,2,2,2]  # 每台虚拟机到应用类型的映射
-NUM_PM = 3  # 实体机数量
 
 def train_test():
     # 初始化环境与智能体
     env = CloudEnv()
-    state_dim = 1 + NUM_TASK_TYPES * max(NUM_VMS_PER_TYPE)  # 状态维度
+    state_dim = 1 + sum(NUM_VMS_PER_TYPE)  # 状态维度
     action_dim = max(NUM_VMS_PER_TYPE)  # 动作维度
     agent = DQNAgent(state_dim, action_dim)
     # 记录每个回合的总奖励
@@ -38,11 +33,13 @@ def train_test():
 
         for step in range(MAX_STEPS):
             # 选择动作
-            action = agent.choose_action(state)
+            action = agent.choose_action_multi(state)
 
             # 执行动作
             task_type = state[0]  # 当前任务类型
-            vm_id = int(task_type * NUM_VMS_PER_TYPE[int(task_type)] + action)
+            # 原来是这里出错了！！！
+            # vm_id = int(task_type * NUM_VMS_PER_TYPE[int(task_type)] + action)
+            vm_id = env.prefix_NUM_VMS_PER_TYPE[int(task_type)] + action  # 虚拟机ID
             reward, done = env.step(int(task_type), vm_id)
             next_state = env.get_state(random.randint(0, NUM_TASK_TYPES - 1))
             next_state = np.array(next_state, dtype=np.float32)
@@ -88,8 +85,8 @@ def train_test():
     plt.show()
 
     # 保存模型
-    torch.save(agent.policy_net.state_dict(), "DQN/policy_net.pth")
-    print("模型已保存到 DQN/policy_net.pth")
+    torch.save(agent.policy_net.state_dict(), "DQN/policy_net(243).pth")
+    print("模型已保存到 DQN/policy_net(243).pth")
 
 
 train_test()

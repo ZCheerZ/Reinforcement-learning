@@ -3,20 +3,13 @@ import random
 import torch
 from collections import defaultdict
 import matplotlib.pyplot as plt  # 用于绘图
-from model_definition import CloudEnv, DQNAgent
-
+from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYPE, NUM_PM
 
 # 超参数
 MAX_STEPS = 50
 
-# 环境参数
-NUM_TASK_TYPES = 3
-NUM_VMS_PER_TYPE = [3,3,3]  # 每种应用类型有3台虚拟机
-NUM_PM = 3  # 实体机数量
-
-
-def load_agent_from_file(policy_net_path="DQN/policy_net.pth"):
-    state_dim = 1 + NUM_TASK_TYPES * max(NUM_VMS_PER_TYPE)  # 状态维度
+def load_agent_from_file(policy_net_path="DQN/policy_net(243).pth"):
+    state_dim = 1 + sum(NUM_VMS_PER_TYPE)  # 状态维度
     action_dim = max(NUM_VMS_PER_TYPE)  # 动作维度
     agent = DQNAgent(state_dim, action_dim)
     agent.policy_net.load_state_dict(torch.load(policy_net_path,weights_only=True))
@@ -46,7 +39,9 @@ def evaluate_with_same_tasks(agent, episodes=500):
         for t in range(MAX_STEPS):
             task_type = all_task_types[ep][t]
             test_state = np.array(state, dtype=np.int32)
-            action = np.argmax(agent.policy_net(torch.FloatTensor(test_state).unsqueeze(0)).detach().numpy()[0])
+            action = agent.choose_action_multi(test_state,0)
+            print(agent.policy_net(torch.FloatTensor(test_state).unsqueeze(0)).detach().numpy()[0])
+            print(f"Episode {ep}, state {test_state}, Task Type {task_type}, Action {action}")
             env_q.step(task_type, env_q.prefix_NUM_VMS_PER_TYPE[task_type] + action)
             # 下一个任务
             next_task_type = all_task_types[ep][t] if t+1 >= MAX_STEPS else all_task_types[ep][t+1]

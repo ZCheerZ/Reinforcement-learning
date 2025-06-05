@@ -21,8 +21,8 @@ overload = 5000
 
 # 环境参数
 NUM_TASK_TYPES = 3  # 应用类型数量
-NUM_VMS_PER_TYPE = [3,3,3]  # 每种应用类型有3台虚拟机
-VMS_PER_TYPE = [0,0,0,1,1,1,2,2,2]  # 每台虚拟机到应用类型的映射
+NUM_VMS_PER_TYPE = [2,4,3]  # 每种应用类型有3台虚拟机
+VMS_PER_TYPE = [0,0,1,1,1,1,2,2,2]  # 每台虚拟机到应用类型的映射
 NUM_PM = 3  # 实体机数量
 TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为了使得离散值都能覆盖到
     0: {"demand": 10, "duration": 25},  # 类型0: 需求10%，持续8步长
@@ -166,6 +166,67 @@ class CloudEnv:
         
         reward = -a * vm_var - b * entity_var - overload_penalty
         return reward, False
+    
+    def step_batch(self, task_types, vm_ids):
+        """
+        批量执行任务分配，不计算奖励，只更新负载和判断过载。
+        若选择的虚拟机超载，尝试分配到同类型下不超载的虚拟机，并记录超载虚拟机。
+        :param task_types: 任务类型数组，如 [0, 1, 2]
+        :param vm_ids:     虚拟机ID数组，如 [3, 5, 7]
+        :return: (vm_load, entity_loads, overload_flag, overload_vms)
+        """
+        overload_vms = []  # 记录本次尝试分配时超载的虚拟机ID
+
+        # 1. 先处理所有虚拟机的任务队列（减少剩余步长，释放负载）
+        for vm in range(sum(NUM_VMS_PER_TYPE)):
+            new_queue = deque()
+            while self.task_queues[vm]:
+                remain_steps, load = self.task_queues[vm].popleft()
+                remain_steps -= 1
+                if remain_steps > 0:
+                    new_queue.append((remain_steps, load))
+                else:
+                    self.vm_load[vm] -= load
+            self.task_queues[vm] = new_queue
+
+        # 2. 批量添加新任务
+        for task_type, vm_id in zip(task_types, vm_ids):
+            task_demand = TASK_CONFIG[task_type]["demand"]
+            task_duration = TASK_CONFIG[task_type]["duration"]
+            # 检查目标虚拟机是否超载
+            if self.vm_load[vm_id] + task_demand <= VM_CAPACITY[VMS_PER_TYPE[vm_id]]:
+                self.vm_load[vm_id] += task_demand
+                self.task_queues[vm_id].append((task_duration, task_demand))
+            else:
+                overload_vms.append(vm_id)
+                # 尝试分配到同类型下其他不超载的虚拟机
+                vm_type = VMS_PER_TYPE[vm_id]
+                # 找到所有同类型虚拟机的ID
+                candidate_vms = [i for i in range(sum(NUM_VMS_PER_TYPE)) if VMS_PER_TYPE[i] == vm_type]
+                allocated = False
+                for alt_vm in candidate_vms:
+                    if self.vm_load[alt_vm] + task_demand <= VM_CAPACITY[vm_type]:
+                        self.vm_load[alt_vm] += task_demand
+                        self.task_queues[alt_vm].append((task_duration, task_demand))
+                        allocated = True
+                        print(f"Task type {task_type} allocated to VM {alt_vm} instead of overloaded VM {vm_id}.")
+                        break
+                # 如果所有同类型虚拟机都超载，则该任务不分配
+
+        # 3. 统计实体机负载
+        entity_loads = []
+        for e in range(NUM_PM):
+            load = sum(
+                self.vm_load[i]
+                for i in range(sum(NUM_VMS_PER_TYPE))
+                if self.vm_to_entity[i] == e
+            )
+            entity_loads.append(load)
+
+        # 4. 判断是否有实体机过载
+        overload_flag = any(l > ENTITY_CAPACITY for l in entity_loads)
+
+        return self.vm_load.copy(), entity_loads, overload_flag, overload_vms
 
     def reset(self):
         self.vm_load.fill(0)
@@ -189,6 +250,8 @@ class DQN(nn.Module):
 # 能具体跟我说说这个DQNAgent它干了什么嘛，可以结合代码进行解释，我不太理解它怎么进行学习的，并且怎么去表示状态q值
 class DQNAgent:
     def __init__(self, state_dim, action_dim):
+
+        self.prefix_NUM_VMS_PER_TYPE = prefix_sum(NUM_VMS_PER_TYPE)
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.epsilon = EPSILON
@@ -202,6 +265,35 @@ class DQNAgent:
 
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=LEARNING_RATE)
         self.loss_fn = nn.MSELoss()
+    
+    def choose_action_multi(self, state ,epsilon=None):
+        if epsilon is None:
+            epsilon = self.epsilon
+        """
+        根据当前状态选择动作，动作空间根据任务类型动态调整。
+        state: (task_type, vm_level_0, ..., vm_level_8)
+        返回：全局虚拟机编号
+        """
+        task_type = int(state[0])
+        # 当前任务类型可选虚拟机编号范围
+        start = self.prefix_NUM_VMS_PER_TYPE[task_type]
+        end = self.prefix_NUM_VMS_PER_TYPE[task_type + 1]
+        available_vm_ids = list(range(start, end))
+        available_actions = [i - start for i in available_vm_ids]  # 动作编号从0开始
+
+        if random.random() < epsilon:
+            # 随机选一个可用动作
+            action = random.choice(available_actions)
+        else:
+            state_tensor = torch.FloatTensor(state).unsqueeze(0)
+            with torch.no_grad():
+                q_values = self.policy_net(state_tensor).cpu().numpy().flatten()
+            # 只在有效可用动作中选最大Q值   可能这一步出错了
+            action = available_actions[np.argmax(q_values[available_actions])]
+        # 返回全局虚拟机编号
+        # return start + action
+        # 返回局部虚拟机编号
+        return action
 
     def choose_action(self, state):
         if random.random() < self.epsilon:
