@@ -5,7 +5,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt  # 用于绘图
 from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYPE, NUM_PM
 
-# 超参数
+# 超参数   反正到存在超载的虚拟机就判断不行了
 MAX_STEPS = 50
 
 def load_agent_from_file(policy_net_path="DQN/policy_net(243).pth"):

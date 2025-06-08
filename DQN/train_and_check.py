@@ -4,15 +4,14 @@ import matplotlib.pyplot as plt  # 用于绘图
 import torch
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='TRUE'
-from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYPE, VMS_PER_TYPE, NUM_PM
+from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYPE, VMS_PER_TYPE, NUM_PM,TARGET_UPDATE_FREQ
 
 # 超参数
 EPSILON = 0.2
 EPSILON_DECAY = 0.995
 MIN_EPSILON = 0.01
-EPISODES = 500
-MAX_STEPS = 500
-TARGET_UPDATE_FREQ = 100
+EPISODES = 3000
+MAX_STEPS = 3000
 
 
 def train_test():
@@ -85,8 +84,9 @@ def train_test():
     plt.show()
 
     # 保存模型
-    torch.save(agent.policy_net.state_dict(), "DQN/policy_net(243).pth")
-    print("模型已保存到 DQN/policy_net(243).pth")
+    file_path = "DQN/policy_net.pth"
+    torch.save(agent.policy_net.state_dict(), file_path)
+    print("模型已保存到", file_path)
 
 
 train_test()
