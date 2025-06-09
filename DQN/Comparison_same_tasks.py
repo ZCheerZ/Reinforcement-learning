@@ -8,13 +8,13 @@ from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYP
 # 超参数   反正到存在超载的虚拟机就判断不行了
 MAX_STEPS = 50
 
-def load_agent_from_file(policy_net_path="DQN/policy_net(243).pth"):
+def load_agent_from_file(policy_net_path="DQN/policy_net.pth"):
     state_dim = 1 + sum(NUM_VMS_PER_TYPE)  # 状态维度
     action_dim = max(NUM_VMS_PER_TYPE)  # 动作维度
     agent = DQNAgent(state_dim, action_dim)
     agent.policy_net.load_state_dict(torch.load(policy_net_path,weights_only=True))
     # agent.policy_net.eval()  # 设置为评估模式（可选）
-    print("模型已从 DQN/policy_net.pth 加载")
+    print("模型已从",policy_net_path,"加载")
     return agent
 
 def evaluate_with_same_tasks(agent, episodes=500):

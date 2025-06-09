@@ -8,9 +8,9 @@ import torch.optim as optim
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='TRUE'
 # 超参数
-LEARNING_RATE = 0.1
+LEARNING_RATE = 0.005
 DISCOUNT_FACTOR = 0.95
-BATCH_SIZE = 128
+BATCH_SIZE = 1000
 MEMORY_SIZE = 50000
 TARGET_UPDATE_FREQ = 100
 EPSILON = 0.3 # 探索率
@@ -20,8 +20,8 @@ overload = 10000
 
 # 环境参数
 NUM_TASK_TYPES = 3  # 应用类型数量
-NUM_VMS_PER_TYPE = [3,3,3]  # 每种应用类型有3台虚拟机
-VMS_PER_TYPE = [0,0,0,1,1,1,2,2,2]  # 每台虚拟机到应用类型的映射
+NUM_VMS_PER_TYPE = [2,4,3]  # 每种应用类型有3台虚拟机
+VMS_PER_TYPE = [0,0,1,1,1,1,2,2,2]  # 每台虚拟机到应用类型的映射
 NUM_PM = 3  # 实体机数量
 TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为了使得离散值都能覆盖到
     0: {"demand": 10, "duration": 25},  # 类型0: 需求10%，持续8步长
