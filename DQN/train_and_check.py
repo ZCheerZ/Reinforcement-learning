@@ -10,8 +10,8 @@ from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYP
 EPSILON = 0.2
 EPSILON_DECAY = 0.995
 MIN_EPSILON = 0.01
-EPISODES = 2000
-MAX_STEPS = 3000
+EPISODES = 3000
+MAX_STEPS = 1000
 
 
 def train_test():
