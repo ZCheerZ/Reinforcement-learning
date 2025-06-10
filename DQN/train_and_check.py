@@ -11,7 +11,7 @@ EPSILON = 0.2
 EPSILON_DECAY = 0.995
 MIN_EPSILON = 0.01
 EPISODES = 3000
-MAX_STEPS = 1000
+MAX_STEPS = 1024
 
 
 def train_test():
@@ -69,9 +69,9 @@ def train_test():
         
 
     # 测试示例
-    # test_task_type = 0
-    # test_state = env.get_state(test_task_type)
-    test_state = (0, 2, 1, 2, 1, 2, 2, 2, 2, 1)
+    test_task_type = 0
+    test_state = env.get_state(test_task_type)
+    # test_state = (0, 2, 1, 2, 1, 2, 2, 2, 2, 1,2)
     test_state = np.array(test_state, dtype=np.float32)
     print(f"测试状态: {test_state}")
     print(f"测试动作值分布: {agent.policy_net(torch.FloatTensor(test_state).unsqueeze(0))}")
@@ -84,7 +84,7 @@ def train_test():
     plt.show()
 
     # 保存模型
-    file_path = "DQN/policy_net(243).pth"
+    file_path = "DQN/policy_net(244).pth"
     torch.save(agent.policy_net.state_dict(), file_path)
     print("模型已保存到", file_path)
 

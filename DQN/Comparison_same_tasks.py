@@ -8,7 +8,7 @@ from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYP
 # 超参数   反正到存在超载的虚拟机就判断不行了
 MAX_STEPS = 50
 
-def load_agent_from_file(policy_net_path="DQN/policy_net(243).pth"):
+def load_agent_from_file(policy_net_path="DQN/policy_net(244).pth"):
     state_dim = 1 + sum(NUM_VMS_PER_TYPE)  # 状态维度
     action_dim = max(NUM_VMS_PER_TYPE)  # 动作维度
     agent = DQNAgent(state_dim, action_dim)
@@ -29,7 +29,7 @@ def evaluate_with_same_tasks(agent, episodes=500):
     for _ in range(episodes):
         task_types = [random.randint(0, NUM_TASK_TYPES-1) for _ in range(MAX_STEPS)]
         all_task_types.append(task_types)
-    print("生成的第一轮任务序列：", all_task_types[0])
+    # print("生成的第一轮任务序列：", all_task_types[0])
     # 2. DQN评估
     env_q = CloudEnv()
     vm_var_q, entity_var_q = [[],[],[]], []
@@ -40,8 +40,8 @@ def evaluate_with_same_tasks(agent, episodes=500):
             task_type = all_task_types[ep][t]
             test_state = np.array(state, dtype=np.int32)
             action = agent.choose_action_multi(test_state,0)
-            print(agent.policy_net(torch.FloatTensor(test_state).unsqueeze(0)).detach().numpy()[0])
-            print(f"Episode {ep}, state {test_state}, Task Type {task_type}, Action {action}")
+            # print(agent.policy_net(torch.FloatTensor(test_state).unsqueeze(0)).detach().numpy()[0])
+            # print(f"Episode {ep}, state {test_state}, Task Type {task_type}, Action {action}")
             env_q.step(task_type, env_q.prefix_NUM_VMS_PER_TYPE[task_type] + action)
             # 下一个任务
             next_task_type = all_task_types[ep][t] if t+1 >= MAX_STEPS else all_task_types[ep][t+1]
