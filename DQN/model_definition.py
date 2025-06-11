@@ -19,16 +19,18 @@ b = 0.5
 overload = 10000
 
 # 环境参数
-NUM_TASK_TYPES = 3  # 应用类型数量
-NUM_VMS_PER_TYPE = [2,4,4]  # 每种应用类型有3台虚拟机
-VMS_PER_TYPE = [0,0,1,1,1,1,2,2,2,2]  # 每台虚拟机到应用类型的映射
+NUM_TASK_TYPES = 4  # 应用类型数量
+NUM_VMS_PER_TYPE = [2,4,4,3]  # 每种应用类型有多少台虚拟机
+VMS_PER_TYPE = [0,0,1,1,1,1,2,2,2,2,3,3,3]  # 每台虚拟机到应用类型的映射
 NUM_PM = 3  # 实体机数量
 TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为了使得离散值都能覆盖到
-    0: {"demand": 10, "duration": 25},  # 类型0: 需求10%，持续8步长
-    1: {"demand": 10, "duration": 25},  # 类型1: 需求10%，持续9步长
-    2: {"demand": 10, "duration": 25},  # 类型2: 需求10%，持续7步长
+    0: {"demand": 10, "duration": 30},  # 类型0: 需求10%，持续8步长
+    1: {"demand": 10, "duration": 30},  # 类型1: 需求10%，持续9步长
+    2: {"demand": 10, "duration": 30},  # 类型2: 需求10%，持续7步长
+    3: {"demand": 10, "duration": 30},  # 类型2: 需求10%，持续7步长
+
 }
-VM_CAPACITY = [100,100,100]  # 虚拟机容量，执行不同应用类型任务的虚拟机资源容量
+VM_CAPACITY = [100,100,100,100]  # 虚拟机容量，执行不同应用类型任务的虚拟机资源容量
 ENTITY_CAPACITY = 200  # 实体机容量（300%）
 
 
@@ -46,7 +48,7 @@ class CloudEnv:
         self.vm_load = np.zeros(sum(NUM_VMS_PER_TYPE), dtype=float)
         
         # 虚拟机到实体机的映射
-        self.vm_to_entity = [0,1,2,0,1,2,0,1,2,0]  # 假设虚拟机i平铺部署在实体机上
+        self.vm_to_entity = [0,1,2,0,1,2,0,1,2,0,1,2,0]  # 假设虚拟机i平铺部署在实体机上
         
         # 任务队列：记录每个虚拟机中正在执行的任务（剩余步长, 负载）
         self.task_queues = [deque() for _ in range(sum(NUM_VMS_PER_TYPE))]
@@ -92,7 +94,7 @@ class CloudEnv:
         all_states = []
         vm_level_range = list(range(1, 11))  # 1~11
         for task_type in range(NUM_TASK_TYPES):
-            # 9台虚拟机，每台有4种level
+            # 每台虚拟机有10种level 10的n次方个组合  所以不能用q-learning
             for vm_levels in itertools.product(vm_level_range, repeat=sum(NUM_VMS_PER_TYPE)):
                 state = (task_type,) + vm_levels
                 all_states.append(state)

@@ -8,7 +8,7 @@ from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYP
 # 超参数   反正到存在超载的虚拟机就判断不行了
 MAX_STEPS = 50
 
-def load_agent_from_file(policy_net_path="DQN/policy_net(244).pth"):
+def load_agent_from_file(policy_net_path="DQN/policy_net(2443).pth"):
     state_dim = 1 + sum(NUM_VMS_PER_TYPE)  # 状态维度
     action_dim = max(NUM_VMS_PER_TYPE)  # 动作维度
     agent = DQNAgent(state_dim, action_dim)
@@ -32,7 +32,7 @@ def evaluate_with_same_tasks(agent, episodes=500):
     # print("生成的第一轮任务序列：", all_task_types[0])
     # 2. DQN评估
     env_q = CloudEnv()
-    vm_var_q, entity_var_q = [[],[],[]], []
+    vm_var_q, entity_var_q = [[],[],[],[]], []
     for ep in range(episodes):
         env_q.reset()
         state = env_q.get_state(all_task_types[ep][0])
@@ -65,7 +65,7 @@ def evaluate_with_same_tasks(agent, episodes=500):
 
     # 3. 随机分配评估（用同样的任务序列）
     env_r = CloudEnv()
-    vm_var_random, entity_var_random = [[],[],[]], []
+    vm_var_random, entity_var_random = [[],[],[],[]], []
     for ep in range(episodes):
         env_r.reset()
         state = env_r.get_state(all_task_types[ep][0])
@@ -98,7 +98,7 @@ def evaluate_with_same_tasks(agent, episodes=500):
 
     # 4. 轮询分配评估（用同样的任务序列）
     env_rr = CloudEnv()
-    vm_var_rr, entity_var_rr = [[],[],[]], []
+    vm_var_rr, entity_var_rr = [[],[],[],[]], []
     rr_pointer = [0 for _ in range(NUM_TASK_TYPES)]  # 每种任务类型一个指针
     for ep in range(episodes):
         env_rr.reset()
@@ -167,7 +167,7 @@ def evaluate():
     plt.figure(figsize=(15,8))
     # 虚拟机负载方差（每种类型单独画线）
     for i in range(NUM_TASK_TYPES):
-        plt.subplot(2,2,i+1)
+        plt.subplot(3,2,i+1)
         plt.plot(vm_var_q[i], label=f"DQN Type {i}")
         plt.plot(vm_var_random[i], '--', label=f"Random Type {i}")
         plt.plot(vm_var_rr[i], ':', label=f"RR Type {i}")
@@ -178,7 +178,7 @@ def evaluate():
         plt.grid()
 
     # 实体机负载方差
-    plt.subplot(2,2,4)
+    plt.subplot(3,2,5)
     plt.plot(entity_var_q, label="DQN")
     plt.plot(entity_var_random, label="Random")
     plt.plot(entity_var_rr, label="RR")

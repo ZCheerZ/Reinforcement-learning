@@ -84,7 +84,7 @@ def train_test():
     plt.show()
 
     # 保存模型
-    file_path = "DQN/policy_net(244).pth"
+    file_path = "DQN/policy_net(2443).pth"
     torch.save(agent.policy_net.state_dict(), file_path)
     print("模型已保存到", file_path)
 
