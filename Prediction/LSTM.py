@@ -119,6 +119,7 @@ def make_predictions(model, data, scaler, time_steps):
     predictions = scaler.inverse_transform(scaled_predictions)
 
     full_predictions = np.empty_like(data)
+    # full_predictions = np.zeros(data, dtype=float)
     full_predictions[:] = np.nan
     full_predictions[time_steps:, 0] = predictions.flatten()
 
