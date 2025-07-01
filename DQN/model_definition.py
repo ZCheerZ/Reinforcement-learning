@@ -20,8 +20,8 @@ overload = 10000
 
 # 环境参数
 NUM_TASK_TYPES = 4  # 应用类型数量
-NUM_VMS_PER_TYPE = [2,4,4,3]  # 每种应用类型有多少台虚拟机
-VMS_PER_TYPE = [0,0,1,1,1,1,2,2,2,2,3,3,3]  # 每台虚拟机到应用类型的映射
+NUM_VMS_PER_TYPE = [2,4,2,3]  # 每种应用类型有多少台虚拟机
+VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3]  # 每台虚拟机到应用类型的映射
 NUM_PM = 3  # 实体机数量
 TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为了使得离散值都能覆盖到
     0: {"demand": 10, "duration": 30},  # 类型0: 需求10%，持续8步长
@@ -48,7 +48,7 @@ class CloudEnv:
         self.vm_load = np.zeros(sum(NUM_VMS_PER_TYPE), dtype=float)
         
         # 虚拟机到实体机的映射
-        self.vm_to_entity = [0,1,2,0,1,2,0,1,2,0,1,2,0]  # 假设虚拟机i平铺部署在实体机上
+        self.vm_to_entity = [0,1,2,0,1,2,0,1,2,0,1]  # 假设虚拟机i平铺部署在实体机上
         
         # 任务队列：记录每个虚拟机中正在执行的任务（剩余步长, 负载）
         self.task_queues = [deque() for _ in range(sum(NUM_VMS_PER_TYPE))]
