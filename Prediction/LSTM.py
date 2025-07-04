@@ -28,7 +28,7 @@ def load_single_column_time_series(file_path):
     return df.values.reshape(-1, 1)
 
 
-def preprocess_data(data, time_steps=10, train_ratio=0.8):
+def preprocess_data(data, time_steps=10, train_ratio=0.5):
 
     # 1. 数据标准化
     scaler = MinMaxScaler(feature_range=(0, 1))
@@ -164,14 +164,14 @@ def save_predictions(original_data, predictions, metrics, file_path):
 
 
 
-def plot_results(original_data, predictions, metrics, time_steps):
+def plot_results(original_data, predictions, metrics, time_steps , train_ratio):
 
     plt.figure(figsize=(12, 6))
 
     # 主图：原始数据和预测结果
     plt.plot(original_data, label='原始数据')
     plt.plot(predictions, label='预测数据', alpha=0.7)
-    plt.axvline(x=len(original_data) * 0.8, color='r', linestyle='--', label='训练集/测试集分割线')
+    plt.axvline(x=len(original_data) * train_ratio, color='r', linestyle='--', label='训练集/测试集分割线')
 
     # 在右上角显示评估指标
     metric_text = "\n".join([f"{name}: {value:.4f}{'%' if name == '平均绝对百分比误差' else ''}"
@@ -193,12 +193,15 @@ def plot_results(original_data, predictions, metrics, time_steps):
 def main():
     """主函数：执行完整预测流程"""
     # 参数配置
+    JOB_ID = 1  # 任务ID
+    # FILE_PATH = "Prediction\\1"+"\\"+str(JOB_ID)+".txt"
+    # 文件路径配置
     FILE_PATH = r"Prediction/cpu_avg.txt"  # 输入数据路径
     SAVE_PATH = r"Prediction/LSTM_pre_cal.csv"  # 结果保存路径
     TIME_STEPS = 10    # 时间窗口大小
     TRAIN_RATIO = 0.8    # 训练集比例
-    EPOCHS = 100   # 最大训练轮数
-    BATCH_SIZE = 32   # 批量大小
+    EPOCHS = 200   # 最大训练轮数
+    BATCH_SIZE = 32  # 批量大小
 
     # 1. 加载数据
     print("步骤1: 加载数据...")
@@ -219,8 +222,7 @@ def main():
 
     # 4. 训练模型
     print("\n步骤4: 训练模型...")
-    model, history = train_model(model, X_train, y_train,
-                                 X_test, y_test, EPOCHS, BATCH_SIZE)
+    model, history = train_model(model, X_train, y_train,X_test, y_test, EPOCHS, BATCH_SIZE)
 
     # 5. 绘制训练历史
     print("\n训练历史可视化:")
@@ -247,8 +249,13 @@ def main():
 
     # 8. 可视化结果
     print("\n预测结果可视化:")
-    plot_results(time_series, predictions, metrics, TIME_STEPS)
+    plot_results(time_series, predictions, metrics, TIME_STEPS ,TRAIN_RATIO)
 
+    write_PATH = "Prediction\\1"+"\\"+str(JOB_ID)+"pre.txt"
+    with open(write_PATH, 'w') as file:  
+        # 遍历数组中的每个元素，并将它们写入文件，每个元素后面跟一个换行符  
+        for element in predictions[~np.isnan(predictions)].flatten()[:20]:  
+            file.write(str("{:.1f}".format(int(element+0.5))) + '\n')
     return predictions, metrics
 
 
@@ -257,3 +264,4 @@ if __name__ == "__main__":
     print("\n前20个有效预测值:")
     valid_preds = predictions[~np.isnan(predictions)].flatten()[:20]
     print(valid_preds)
+    

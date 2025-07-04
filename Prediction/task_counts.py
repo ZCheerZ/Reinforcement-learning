@@ -162,23 +162,47 @@ def calculate_task_counts_by_type_multi(task_sequence, task_durations):
     return counts, all_types
 
 
+def calculate_processing_tasks(task_sequence, task_duration):
+    """
+    计算每个时刻正在处理的任务数（单一任务类型，支持每时刻多个任务到来）
+    :param task_sequence: list，每个时刻新到来的任务数
+    :param task_duration: int，任务处理时长
+    :return: list，每个时刻正在处理的任务数
+    """
+    T = len(task_sequence)
+    diff = [0] * (T + task_duration + 1)
+    for t, num in enumerate(task_sequence):
+        diff[t] += num
+        if t + task_duration < len(diff):
+            diff[t + task_duration] -= num
+    counts = []
+    current = 0
+    for i in range(T):
+        current += diff[i]
+        counts.append(current)
+    return counts
+
+
 # 示例用法
 if __name__ == "__main__":
-    task_sequence = [1, 2, 1, 3, 2, 1]
-    task_durations = {1: 2, 2: 3, 3: 1}
-    
+    # task_sequence = [1, 2, 1, 3, 2, 1]
+    # task_durations = {1: 2, 2: 3, 3: 1}
     # counts = calculate_task_counts1(task_sequence, task_durations)
     # print(counts)  # 输出每个时刻的任务数
-
     # counts = calculate_task_counts2(task_sequence, task_durations)
     # print(counts)  # 输出每个时刻的任务数
-
     # all_counts,all_types = calculate_task_counts_by_type(task_sequence, task_durations)
     # print(all_counts)  # 输出每种任务类型在每个时刻的任务数
     # print(all_types)  # 输出任务类型顺序    
 
-    task_sequence_multi = [[1,2], [2,3], [1,3], [3,2], [2,1], [1,2,3]]
-    task_durations = {1: 2, 2: 3, 3: 1}
-    all_counts, all_types = calculate_task_counts_by_type_multi(task_sequence_multi, task_durations)
-    print(all_counts)  # 输出每种任务类型在每个时刻的任务数
-    print(all_types)   # 输出任务类型顺序
+    # task_sequence_multi = [[1,2], [2,3], [1,3], [3,2], [2,1], [1,2,3]]
+    # task_durations = {1: 2, 2: 3, 3: 1}
+    # all_counts, all_types = calculate_task_counts_by_type_multi(task_sequence_multi, task_durations)
+    # print(all_counts)  # 输出每种任务类型在每个时刻的任务数
+    # print(all_types)   # 输出任务类型顺序
+
+    # 示例用法
+    task_sequence = [1, 2, 1, 3, 2, 1]
+    task_duration = 3
+    counts = calculate_processing_tasks(task_sequence, task_duration)
+    print(counts)  # 输出每个时刻正在处理的任务数
