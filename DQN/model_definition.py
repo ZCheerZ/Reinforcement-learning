@@ -46,14 +46,14 @@ class CloudEnv:
     def __init__(self):
         # 虚拟机负载（百分比），格式：{虚拟机ID: 当前总负载}
         self.vm_load = np.zeros(sum(NUM_VMS_PER_TYPE), dtype=float)
-        
-        # 虚拟机到实体机的映射
+        # 虚拟机到实体机的映射  todo:到时候需要动态表示
         self.vm_to_entity = [0,1,2,0,1,2,0,1,2,0,1]  # 假设虚拟机i平铺部署在实体机上
-        
         # 任务队列：记录每个虚拟机中正在执行的任务（剩余步长, 负载）
         self.task_queues = [deque() for _ in range(sum(NUM_VMS_PER_TYPE))]
-
+        # 每种应用类型对应虚拟机数量前缀和
         self.prefix_NUM_VMS_PER_TYPE = prefix_sum(NUM_VMS_PER_TYPE)
+        # 初始化轮询指针
+        self.rr_pointer = [0 for _ in range(NUM_TASK_TYPES)]
         
     def _get_vm_level(self, load, vm_type):
         rate = load / VM_CAPACITY[vm_type] *100  # 获取对应虚拟机的容量比率
@@ -168,7 +168,7 @@ class CloudEnv:
         reward = -a * vm_var - b * entity_var - overload_penalty
         return reward, False
     
-    def step_batch(self, task_types, agent):
+    def step_batch(self, task_types, agent , choose_function):
         """
         批量执行任务分配，不计算奖励，只更新负载和判断过载。
         若选择的虚拟机超载，尝试分配到同类型下不超载的虚拟机，并记录超载虚拟机。
@@ -198,7 +198,14 @@ class CloudEnv:
             task_duration = TASK_CONFIG[task_type]["duration"]
             state = self.get_state(task_type)
             test_state = np.array(state, dtype=np.int32)
-            action = agent.choose_action_multi(test_state,0)
+            if(choose_function == "DQN"):
+                action = agent.choose_action_multi(test_state,0)
+            elif(choose_function == "RR"):
+                available_actions = list(range(NUM_VMS_PER_TYPE[task_type]))
+                action = self.rr_pointer[task_type]
+                self.rr_pointer[task_type] = (self.rr_pointer[task_type] + 1) % NUM_VMS_PER_TYPE[task_type]
+
+
             vm_id = self.prefix_NUM_VMS_PER_TYPE[task_type] + action  # 获取全局虚拟机ID
             # 检查目标虚拟机是否超载
             if self.vm_load[vm_id] + task_demand <= VM_CAPACITY[VMS_PER_TYPE[vm_id]]:
