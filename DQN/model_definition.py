@@ -168,17 +168,19 @@ class CloudEnv:
         reward = -a * vm_var - b * entity_var - overload_penalty
         return reward, False
     
-    def step_batch(self, task_types, vm_ids):
+    def step_batch(self, task_types, agent):
         """
         批量执行任务分配，不计算奖励，只更新负载和判断过载。
         若选择的虚拟机超载，尝试分配到同类型下不超载的虚拟机，并记录超载虚拟机。
         :param task_types: 任务类型数组，如 [0, 1, 2]
-        :param vm_ids:     虚拟机ID数组，如 [3, 5, 7]
+        :param agent:      DQNAgent 实例，用于获取动作
         :return: (vm_load, entity_loads, overload_flag, overload_vms)
         """
         overload_vms = []  # 记录本次尝试分配时超载的虚拟机ID
 
-        # 1. 先处理所有虚拟机的任务队列（减少剩余步长，释放负载）
+        #此处引出一个之前忽略的问题  就是我这个选择动作应该放到处理所有虚拟机的任务队列之后  我之前的学习都是放在之前就选完了  先看效果吧
+
+        # 1. 处理所有虚拟机的任务队列（减少剩余步长，释放负载）  
         for vm in range(sum(NUM_VMS_PER_TYPE)):
             new_queue = deque()
             while self.task_queues[vm]:
@@ -191,9 +193,13 @@ class CloudEnv:
             self.task_queues[vm] = new_queue
 
         # 2. 批量添加新任务
-        for task_type, vm_id in zip(task_types, vm_ids):
+        for task_type in (task_types):
             task_demand = TASK_CONFIG[task_type]["demand"]
             task_duration = TASK_CONFIG[task_type]["duration"]
+            state = self.get_state(task_type)
+            test_state = np.array(state, dtype=np.int32)
+            action = agent.choose_action_multi(test_state,0)
+            vm_id = self.prefix_NUM_VMS_PER_TYPE[task_type] + action  # 获取全局虚拟机ID
             # 检查目标虚拟机是否超载
             if self.vm_load[vm_id] + task_demand <= VM_CAPACITY[VMS_PER_TYPE[vm_id]]:
                 self.vm_load[vm_id] += task_demand
@@ -213,6 +219,7 @@ class CloudEnv:
                         print(f"Task type {task_type} allocated to VM {alt_vm} instead of overloaded VM {vm_id}.")
                         break
                 # 如果所有同类型虚拟机都超载，则该任务不分配
+   
 
         # 3. 统计实体机负载
         entity_loads = []
