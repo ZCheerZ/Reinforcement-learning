@@ -9,8 +9,9 @@ def read_data_from_txt(folder_path, num_types):
         with open(file_path, "r") as f:
             # 读取所有行，去除空行和换行符，并转为 float
             arr = [float(line.strip()) for line in f if line.strip()]
+            arr_sorted = sorted(arr, reverse=True)
             # arr = [(line.strip()) for line in f if line.strip()]
-            data.append(arr)
+            data.append(arr_sorted)
     return data
 
 def main():
@@ -70,14 +71,24 @@ def main():
             print(f"j={j}: {dp[i][j]}", end=" | ")
         print("\n" + "-" * 50)
 
+    do_task = [0] * num_types # 记录每种类型的任务执行数
     t = 2  # 假设一开始不满足3个需求
     now_sla = t
     for i in range(num_types-1,-1,-1):
-        print(f"应用类型{i}允许违规数: {now_sla-path[i][t]}, 执行任务数为{a[i][now_sla-path[i][t]]}", end="\n")
+        print(f"应用类型{i+1}允许违规数: {now_sla-path[i][t]}, 执行任务数为{a[i][now_sla-path[i][t]]}", end="\n")
+        do_task[i] = a[i][now_sla - path[i][t]]
         now_sla = path[i][t]
         t = path[i][t]
-        
-        
+    
+    task_needs = [2, 6, 3]  # 假设每种类型的任务需求值 cpu
+    vm_resources = [10] * num_types  # 初始化每种类型的虚拟机资源 cpu
+    vm_nums = [0] * num_types  # 初始化每种类型的虚拟机数量
+    for i in range(num_types):
+        # 计算每种类型的虚拟机数量
+        vm_nums[i] = int(np.ceil(do_task[i]*task_needs[i] / vm_resources[i]))
+        print(f"应用类型{i+1}的虚拟机数量: {vm_nums[i]}")
+    # 写文件  虚拟机数量  以及实体机数量  到时候开完组会 确定是否要超频处理得到实体机数量！首先是确定实体机数量 其次是确定一个实体机放几个虚拟机
+
 if __name__ == "__main__":
     main()
 

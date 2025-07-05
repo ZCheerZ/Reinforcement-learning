@@ -1,5 +1,7 @@
 import heapq
 from collections import defaultdict, deque
+import pandas as pd 
+import numpy as np 
 
 # def calculate_task_counts1(task_sequence, task_durations):
 #     """
@@ -162,13 +164,15 @@ def calculate_task_counts_by_type_multi(task_sequence, task_durations):
     return counts, all_types
 
 
-def calculate_processing_tasks(task_sequence, task_duration):
+def calculate_processing_tasks(task_sequence, task_duration, file_path=None):
     """
     计算每个时刻正在处理的任务数（单一任务类型，支持每时刻多个任务到来）
     :param task_sequence: list，每个时刻新到来的任务数
     :param task_duration: int，任务处理时长
     :return: list，每个时刻正在处理的任务数
     """
+    if file_path:
+        task_sequence =(pd.read_csv(file_path, sep=' ', header=None)[0]).to_list()
     T = len(task_sequence)
     diff = [0] * (T + task_duration + 1)
     for t, num in enumerate(task_sequence):
@@ -204,5 +208,5 @@ if __name__ == "__main__":
     # 示例用法
     task_sequence = [1, 2, 1, 3, 2, 1]
     task_duration = 3
-    counts = calculate_processing_tasks(task_sequence, task_duration)
+    counts = calculate_processing_tasks(task_sequence, task_duration , file_path="Prediction\\1"+"\\"+str(1)+"pre.txt")
     print(counts)  # 输出每个时刻正在处理的任务数
