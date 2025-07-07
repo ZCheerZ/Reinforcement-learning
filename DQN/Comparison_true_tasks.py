@@ -53,6 +53,8 @@ def evaluate_with_true_tasks(agent, episodes=100):
         # print("env_q.vm_load:", env_q.vm_load)
         # 记录实体机方差
         entity_var_q.append(np.var(entity_loads))
+        if(overload_flag): 
+            print(f"DQN Episode {ep} has overload VMs: {overload_vms}")
 
     # # 3. 随机分配评估（用同样的任务序列）
     # env_r = CloudEnv()
@@ -111,6 +113,8 @@ def evaluate_with_true_tasks(agent, episodes=100):
             )
             entity_loads.append(load)
         entity_var_rr.append(np.var(entity_loads))
+        if(overload_flag): 
+            print(f"RR Episode {ep} has overload VMs: {overload_vms}")
 
     return vm_var_q, entity_var_q, vm_var_rr, entity_var_rr
 
