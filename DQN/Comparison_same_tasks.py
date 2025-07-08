@@ -82,10 +82,10 @@ def evaluate_with_same_tasks(agent, episodes=500):
             start = env_r.prefix_NUM_VMS_PER_TYPE[task_type]
             end = env_r.prefix_NUM_VMS_PER_TYPE[task_type+1]
             vm_var_random[task_type].append(np.var(env_r.vm_load[start:end]))
-
-        # 记录实体机方差
-        vm_var_random.append(np.var(env_r.vm_load))
+        # vm_var_random.append(np.var(env_r.vm_load))
         # print("env_r.vm_load:", env_r.vm_load)
+        # 记录实体机方差
+        
         entity_loads = []
         for e in range(NUM_PM):
             load = sum(

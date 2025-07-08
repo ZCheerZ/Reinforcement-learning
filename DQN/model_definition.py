@@ -21,7 +21,12 @@ overload = 10000
 # 环境参数
 NUM_TASK_TYPES = 4  # 应用类型数量
 NUM_VMS_PER_TYPE = [2,4,2,3]  # 每种应用类型有多少台虚拟机
-VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3]  # 每台虚拟机到应用类型的映射
+VMS_PER_TYPE = [] # 每台虚拟机到应用类型的映射
+for i in range(NUM_TASK_TYPES):
+    for j in range(NUM_VMS_PER_TYPE[i]):
+        VMS_PER_TYPE.append(i)
+# print("VMS_PER_TYPE:", VMS_PER_TYPE)
+# VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3]  
 NUM_PM = 3  # 实体机数量
 TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为了使得离散值都能覆盖到
     0: {"demand": 10, "duration": 30},  # 类型0: 需求10%，持续8步长
@@ -47,7 +52,11 @@ class CloudEnv:
         # 虚拟机负载（百分比），格式：{虚拟机ID: 当前总负载}
         self.vm_load = np.zeros(sum(NUM_VMS_PER_TYPE), dtype=float)
         # 虚拟机到实体机的映射  todo:到时候需要动态表示
-        self.vm_to_entity = [0,1,2,0,1,2,0,1,2,0,1]  # 假设虚拟机i平铺部署在实体机上
+        self.vm_to_entity = []  # 每个虚拟机对应的实体机ID 假设虚拟机i平铺部署在实体机上
+        for i in range(sum(NUM_VMS_PER_TYPE)):
+            self.vm_to_entity.append(i%NUM_PM) 
+        print("vm_to_entity:", self.vm_to_entity)
+        # self.vm_to_entity = [0,1,2,0,1,2,0,1,2,0,1] 
         # 任务队列：记录每个虚拟机中正在执行的任务（剩余步长, 负载）
         self.task_queues = [deque() for _ in range(sum(NUM_VMS_PER_TYPE))]
         # 每种应用类型对应虚拟机数量前缀和
@@ -204,6 +213,9 @@ class CloudEnv:
                 available_actions = list(range(NUM_VMS_PER_TYPE[task_type]))
                 action = self.rr_pointer[task_type]
                 self.rr_pointer[task_type] = (self.rr_pointer[task_type] + 1) % NUM_VMS_PER_TYPE[task_type]
+            elif(choose_function == "Random"):
+                available_actions = list(range(NUM_VMS_PER_TYPE[task_type]))
+                action = random.choice(available_actions)
 
 
             vm_id = self.prefix_NUM_VMS_PER_TYPE[task_type] + action  # 获取全局虚拟机ID
@@ -233,7 +245,7 @@ class CloudEnv:
         for e in range(NUM_PM):
             load = sum(
                 self.vm_load[i]
-                for i in range(sum(NUM_VMS_PER_TYPE))
+                for i in range(self.prefix_NUM_VMS_PER_TYPE[-1])
                 if self.vm_to_entity[i] == e
             )
             entity_loads.append(load)
@@ -359,6 +371,3 @@ class DQNAgent:
 
     def update_target_network(self):
         self.target_net.load_state_dict(self.policy_net.state_dict())
-
-
-

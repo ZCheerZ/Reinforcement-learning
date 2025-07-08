@@ -38,7 +38,7 @@ def evaluate_with_true_tasks(agent, episodes=100):
     """
     # 1. 生成所有任务序列（每一轮的任务类型序列）
     all_task_types = get_task_sequence(episodes=episodes, max_tasks=5)
-    print("生成的第一轮任务序列：", all_task_types)
+    # print("生成的第一轮任务序列：", all_task_types)
     # 2. DQN评估
     env_q = CloudEnv()
     vm_var_q, entity_var_q = [[],[],[],[]], []
@@ -56,101 +56,72 @@ def evaluate_with_true_tasks(agent, episodes=100):
         if(overload_flag): 
             print(f"DQN Episode {ep} has overload VMs: {overload_vms}")
 
-    # # 3. 随机分配评估（用同样的任务序列）
-    # env_r = CloudEnv()
-    # vm_var_random, entity_var_random = [[],[],[],[]], []
-    # for ep in range(episodes):
-    #     env_r.reset()
-    #     state = env_r.get_state(all_task_types[ep][0])
-    #     for t in range(MAX_STEPS):
-    #         task_type = all_task_types[ep][t]
-    #         available_actions = list(range(NUM_VMS_PER_TYPE[task_type]))
-    #         action = random.choice(available_actions)
-    #         env_r.step(task_type, env_r.prefix_NUM_VMS_PER_TYPE[task_type] + action)
-    #         # 下一个任务
-    #         next_task_type = all_task_types[ep][t] if t+1 >= MAX_STEPS else all_task_types[ep][t+1]
-    #         state = env_r.get_state(next_task_type)
-    #     # 记录每种类型虚拟机的负载方差
-    #     for task_type in range(NUM_TASK_TYPES):
-    #         start = env_r.prefix_NUM_VMS_PER_TYPE[task_type]
-    #         end = env_r.prefix_NUM_VMS_PER_TYPE[task_type+1]
-    #         vm_var_random[task_type].append(np.var(env_r.vm_load[start:end]))
-
-    #     # 记录实体机方差
-    #     vm_var_random.append(np.var(env_r.vm_load))
-    #     # print("env_r.vm_load:", env_r.vm_load)
-    #     entity_loads = []
-    #     for e in range(NUM_PM):
-    #         load = sum(
-    #             env_r.vm_load[i]
-    #             for i in range(env_r.prefix_NUM_VMS_PER_TYPE[-1])
-    #             if env_r.vm_to_entity[i] == e
-    #         )
-    #         entity_loads.append(load)
-    #     entity_var_random.append(np.var(entity_loads))
+    # 3. 随机分配评估（用同样的任务序列）
+    env_r = CloudEnv()
+    vm_var_random, entity_var_random = [[],[],[],[]], []
+    for ep in range(episodes):
+        env_r.reset()
+        vm_load, entity_loads, overload_flag, overload_vms  = env_r.step_batch(all_task_types[ep], agent= None, choose_function="Random")
+        # 记录每种类型虚拟机的负载方差
+        for task_type in range(NUM_TASK_TYPES):
+            start = env_r.prefix_NUM_VMS_PER_TYPE[task_type]
+            end = env_r.prefix_NUM_VMS_PER_TYPE[task_type+1]
+            vm_var_random[task_type].append(np.var(vm_load[start:end]))
+        # print("env_r.vm_load:", env_r.vm_load)
+        # 记录实体机方差   
+        entity_var_random.append(np.var(entity_loads))     
+        if(overload_flag): 
+            print(f"Random Episode {ep} has overload VMs: {overload_vms}")
 
     # 4. 轮询分配评估（用同样的任务序列）
     env_rr = CloudEnv()
     vm_var_rr, entity_var_rr = [[],[],[],[]], []
-    rr_pointer = [0 for _ in range(NUM_TASK_TYPES)]  # 每种任务类型一个指针
     for ep in range(episodes):
         env_rr.reset()
         vm_load, entity_loads, overload_flag, overload_vms  = env_rr.step_batch(all_task_types[ep], agent = None, choose_function="RR")
-        # 记录方差   虚拟机方差应该是同类型的  然后不同类型的求其平均
         # 记录每种类型虚拟机的负载方差
         for task_type in range(NUM_TASK_TYPES):
             start = env_rr.prefix_NUM_VMS_PER_TYPE[task_type]
             end = env_rr.prefix_NUM_VMS_PER_TYPE[task_type+1]
             vm_var_rr[task_type].append(np.var(vm_load[start:end]))
-        # 记录实体机方差
-        entity_loads = []
         # print("env_rr.vm_load:", env_rr.vm_load)
-        for e in range(NUM_PM):
-            load = sum(
-                env_rr.vm_load[i]
-                for i in range(env_rr.prefix_NUM_VMS_PER_TYPE[-1])
-                if env_rr.vm_to_entity[i] == e
-            )
-            entity_loads.append(load)
+        # 记录实体机方差
         entity_var_rr.append(np.var(entity_loads))
         if(overload_flag): 
             print(f"RR Episode {ep} has overload VMs: {overload_vms}")
 
-    return vm_var_q, entity_var_q, vm_var_rr, entity_var_rr
-
-
-    # return vm_var_q, entity_var_q, vm_var_random, entity_var_random, vm_var_rr, entity_var_rr
+    return vm_var_q, entity_var_q, vm_var_random, entity_var_random, vm_var_rr, entity_var_rr
 
 def evaluate():
 
     agent = load_agent_from_file()
 
     # 用真实任务序列评估
-    # vm_var_q, entity_var_q, vm_var_random, entity_var_random, vm_var_rr, entity_var_rr = evaluate_with_true_tasks(agent, episodes=10)
+    vm_var_q, entity_var_q, vm_var_random, entity_var_random, vm_var_rr, entity_var_rr = evaluate_with_true_tasks(agent, episodes=500)
 
-    vm_var_q, entity_var_q, vm_var_rr, entity_var_rr= evaluate_with_true_tasks(agent, episodes=100)
+    # vm_var_q, entity_var_q, vm_var_rr, entity_var_rr= evaluate_with_true_tasks(agent, episodes=100)
 
 
     # 计算每种类型虚拟机方差的均值
     avg_vm_var_q = [np.mean(vm_var_q[i]) for i in range(NUM_TASK_TYPES)]
-    # avg_vm_var_random = [np.mean(vm_var_random[i]) for i in range(NUM_TASK_TYPES)]
+    avg_vm_var_random = [np.mean(vm_var_random[i]) for i in range(NUM_TASK_TYPES)]
     avg_vm_var_rr = [np.mean(vm_var_rr[i]) for i in range(NUM_TASK_TYPES)]
     avg_entity_var_q = np.mean(entity_var_q)
-    # avg_entity_var_random = np.mean(entity_var_random)
+    avg_entity_var_random = np.mean(entity_var_random)
     avg_entity_var_rr = np.mean(entity_var_rr)
     # print("--------------------------------------")
     print("各算法每种应用类型虚拟机负载方差均值：")
     for i in range(NUM_TASK_TYPES):
-        print(f"Type {i} - DQN: {avg_vm_var_q[i]:.4f}, RR: {avg_vm_var_rr[i]:.4f}") #, Random: {avg_vm_var_random[i]:.4f}
+        print(f"Type {i} - DQN: {avg_vm_var_q[i]:.4f}, Random: {avg_vm_var_random[i]:.4f}, RR: {avg_vm_var_rr[i]:.4f}")
     print("--------------------------------------")
     print("各算法实体机负载方差均值：")
     print(f"DQN:       {avg_entity_var_q:.4f}")
-    # print(f"Random:    {avg_entity_var_random:.4f}")
+    print(f"Random:    {avg_entity_var_random:.4f}")
     print(f"RR:        {avg_entity_var_rr:.4f}")
     print("--------------------------------------")
     print("多目标加权后各算法对比值：")
     print(f"DQN:       {0.4*np.mean(vm_var_q) + 0.5*avg_entity_var_q:.4f}")
-    # print(f"Random:    {0.4*np.mean(avg_vm_var_random) + 0.5*avg_entity_var_random:.4f}")
+    print(f"Random:    {0.4*np.mean(avg_vm_var_random) + 0.5*avg_entity_var_random:.4f}")
     print(f"RR:        {0.4*np.mean(avg_vm_var_rr) + 0.5*avg_entity_var_rr:.4f}")
 
     # 绘图
@@ -159,7 +130,7 @@ def evaluate():
     for i in range(NUM_TASK_TYPES):
         plt.subplot(3,2,i+1)
         plt.plot(vm_var_q[i], label=f"DQN Type {i}")
-        # plt.plot(vm_var_random[i], '--', label=f"Random Type {i}")
+        plt.plot(vm_var_random[i], '--', label=f"Random Type {i}")
         plt.plot(vm_var_rr[i], ':', label=f"RR Type {i}")
         plt.title("VM load variance (per type)")
         plt.xlabel("Episode")
@@ -170,7 +141,7 @@ def evaluate():
     # 实体机负载方差
     plt.subplot(3,2,5)
     plt.plot(entity_var_q, label="DQN")
-    # plt.plot(entity_var_random, label="Random")
+    plt.plot(entity_var_random, label="Random")
     plt.plot(entity_var_rr, label="RR")
     plt.title("PM load variance")
     plt.xlabel("Episode")
