@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt  # 用于绘图
 from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYPE, NUM_PM
 
 # 超参数   反正到存在超载的虚拟机就判断不行了
-MAX_STEPS = 50
+MAX_STEPS = 500
 
 def load_agent_from_file(policy_net_path="DQN/model/policy_net(2423).pth"):
     state_dim = 1 + sum(NUM_VMS_PER_TYPE)  # 状态维度

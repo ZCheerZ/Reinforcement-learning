@@ -253,6 +253,24 @@ class CloudEnv:
         # 4. 判断是否有实体机过载
         overload_flag = any(l > ENTITY_CAPACITY for l in entity_loads)
 
+        print("虚拟机资源利用率：")
+        for i in range(len(self.vm_load)):
+            vm_type = VMS_PER_TYPE[i]
+            utilization = self.vm_load[i] / VM_CAPACITY[vm_type]
+            print(f"VM {i} (Type {vm_type}): {utilization:.2%}")
+
+        # 输出每个实体机的资源利用率
+        print("实体机资源利用率：")
+        for pm_id in range(NUM_PM):
+            # 统计该实体机上所有虚拟机的负载总和
+            total_load = sum(
+                self.vm_load[i]
+                for i in range(len(self.vm_load))
+                if self.vm_to_entity[i] == pm_id
+            )
+            utilization = total_load / ENTITY_CAPACITY
+            print(f"PM {pm_id}: {utilization:.2%}")
+
         return self.vm_load.copy(), entity_loads, overload_flag, overload_vms
 
     def reset(self):

@@ -38,12 +38,12 @@ def evaluate_with_true_tasks(agent, episodes=100):
     """
     # 1. 生成所有任务序列（每一轮的任务类型序列）
     all_task_types = get_task_sequence(episodes=episodes, max_tasks=5)
-    # print("生成的第一轮任务序列：", all_task_types)
+    print("生成的第一轮任务序列：", all_task_types)
     # 2. DQN评估
     env_q = CloudEnv()
     vm_var_q, entity_var_q = [[],[],[],[]], []
+    env_q.reset()
     for ep in range(episodes):
-        env_q.reset()
         vm_load, entity_loads, overload_flag, overload_vms  = env_q.step_batch(all_task_types[ep], agent, choose_function="DQN")
         # 记录每种类型虚拟机的负载方差
         for task_type in range(NUM_TASK_TYPES):
@@ -59,8 +59,8 @@ def evaluate_with_true_tasks(agent, episodes=100):
     # 3. 随机分配评估（用同样的任务序列）
     env_r = CloudEnv()
     vm_var_random, entity_var_random = [[],[],[],[]], []
+    env_r.reset()
     for ep in range(episodes):
-        env_r.reset()
         vm_load, entity_loads, overload_flag, overload_vms  = env_r.step_batch(all_task_types[ep], agent= None, choose_function="Random")
         # 记录每种类型虚拟机的负载方差
         for task_type in range(NUM_TASK_TYPES):
@@ -76,8 +76,8 @@ def evaluate_with_true_tasks(agent, episodes=100):
     # 4. 轮询分配评估（用同样的任务序列）
     env_rr = CloudEnv()
     vm_var_rr, entity_var_rr = [[],[],[],[]], []
+    env_rr.reset()
     for ep in range(episodes):
-        env_rr.reset()
         vm_load, entity_loads, overload_flag, overload_vms  = env_rr.step_batch(all_task_types[ep], agent = None, choose_function="RR")
         # 记录每种类型虚拟机的负载方差
         for task_type in range(NUM_TASK_TYPES):
@@ -97,7 +97,7 @@ def evaluate():
     agent = load_agent_from_file()
 
     # 用真实任务序列评估
-    vm_var_q, entity_var_q, vm_var_random, entity_var_random, vm_var_rr, entity_var_rr = evaluate_with_true_tasks(agent, episodes=500)
+    vm_var_q, entity_var_q, vm_var_random, entity_var_random, vm_var_rr, entity_var_rr = evaluate_with_true_tasks(agent, episodes=10)
 
     # vm_var_q, entity_var_q, vm_var_rr, entity_var_rr= evaluate_with_true_tasks(agent, episodes=100)
 
