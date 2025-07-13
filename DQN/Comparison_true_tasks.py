@@ -22,13 +22,17 @@ def get_task_sequence(episodes=10, max_tasks=5):
     :param episodes: 周期的最大步数 也就是一个周期有多少个时隙
     :return: all_task_types
     """
+    
     all_task_types = []
-    for _ in range(episodes):
-        task_types = [random.randint(0, NUM_TASK_TYPES-1) for _ in range(max_tasks)]
-        all_task_types.append(task_types)
+    with open("DQN/task_sequence.txt", "w") as f:
+        for _ in range(episodes):
+            task_types = [random.randint(0, NUM_TASK_TYPES-1) for _ in range(max_tasks)]
+            f.write(" ".join(map(str, task_types)) + "\n")
+            all_task_types.append(task_types)
+    # 将all_task_types 写到txt文件中
     return all_task_types
 
-def get_task_sequence_from_file(file_path, episodes=10, max_tasks=5):
+def get_task_sequence_from_file(file_path):
     """
     从文件中读取任务序列（每一周期的任务类型序列）
     :param file_path: 文件路径
@@ -40,11 +44,8 @@ def get_task_sequence_from_file(file_path, episodes=10, max_tasks=5):
     with open(file_path, 'r') as f:
         for line in f:
             task_types = list(map(int, line.strip().split()))
-            if len(task_types) > max_tasks:
-                task_types = task_types[:max_tasks]
             all_task_types.append(task_types)
-            if len(all_task_types) >= episodes:
-                break
+    print("从文件中读取的任务序列：", all_task_types)
     return all_task_types
 
 
@@ -204,3 +205,4 @@ def evaluate():
     plt.show()
 
 evaluate()
+# get_task_sequence_from_file("DQN/task_sequence.txt")
