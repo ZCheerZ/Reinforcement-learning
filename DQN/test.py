@@ -53,7 +53,7 @@ def evaluate_load_balance():
             load = sum(
                 vm_load[i]
                 for i in range(sum(NUM_VMS_PER_TYPE))
-                if env.vm_to_entity[i] == e
+                if env.vm_to_pm[i] == e
             )
             entity_loads.append(load)
         print(f"实体机负载: {entity_loads}")

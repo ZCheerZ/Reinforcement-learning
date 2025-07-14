@@ -13,31 +13,66 @@ DISCOUNT_FACTOR = 0.8
 BATCH_SIZE = 64
 MEMORY_SIZE = 50000
 TARGET_UPDATE_FREQ = 100
-EPSILON = 0.3 # 探索率
+EPSILON = 0.2 # 探索率
 a = 0.4 
 b = 0.5
 overload = 10000
 
 # 环境参数
 NUM_TASK_TYPES = 4  # 应用类型数量
-NUM_VMS_PER_TYPE = [2,4,2,3]  # 每种应用类型有多少台虚拟机
+NUM_VMS_PER_TYPE = [2,4,2,3]  # 每种应用类型有多少台虚拟机 VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3] 
 VMS_PER_TYPE = [] # 每台虚拟机到应用类型的映射
 for i in range(NUM_TASK_TYPES):
     for j in range(NUM_VMS_PER_TYPE[i]):
         VMS_PER_TYPE.append(i)
 # print("VMS_PER_TYPE:", VMS_PER_TYPE)
-# VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3]  
 NUM_PM = 3  # 实体机数量
-TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为了使得离散值都能覆盖到
-    0: {"demand": 10, "duration": 30},  # 类型0: 需求10%，持续8步长
-    1: {"demand": 10, "duration": 30},  # 类型1: 需求10%，持续9步长
-    2: {"demand": 10, "duration": 30},  # 类型2: 需求10%，持续7步长
-    3: {"demand": 10, "duration": 30},  # 类型2: 需求10%，持续7步长
+TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为了使得离散值都能覆盖到 训练的时候可以把duration拉长以覆盖更多，实际用的时候用实际值
+    0: {"demand": 10, "duration": 10},  # 类型0: 需求10%，持续8步长
+    1: {"demand": 10, "duration": 10},  # 类型1: 需求10%，持续9步长
+    2: {"demand": 10, "duration": 10},  # 类型2: 需求10%，持续7步长
+    3: {"demand": 10, "duration": 10},  # 类型2: 需求10%，持续7步长
 
 }
 VM_CAPACITY = [100,100,100,100]  # 虚拟机容量，执行不同应用类型任务的虚拟机资源容量
-ENTITY_CAPACITY = 200  # 实体机容量（300%）
+PM_CAPACITY = 200  # 实体机容量（300%）
 
+def env_params_reset(num_pm=None, num_task_types=None, num_vms_per_type=None, task_config=None, vm_capacity=None, pm_capacity=None):
+    """
+    重置环境参数
+    :param num_pm: 实体机数量
+    :param num_task_types: 任务类型数量
+    :param num_vms_per_type: 每种任务类型的虚拟机数量
+    :param task_config: 任务配置字典，包含每种任务类型的需求和持续时间
+    :param vm_capacity: 虚拟机容量列表
+    :param entity_capacity: 实体机容量
+    """
+    global NUM_PM, NUM_TASK_TYPES, NUM_VMS_PER_TYPE, VMS_PER_TYPE, VM_CAPACITY, PM_CAPACITY ,TASK_CONFIG
+    if num_pm is not None:
+        NUM_PM = num_pm
+    if num_task_types is not None:
+        NUM_TASK_TYPES = num_task_types
+    if num_vms_per_type is not None:
+        NUM_VMS_PER_TYPE = num_vms_per_type
+    VMS_PER_TYPE = []
+    for i in range(NUM_TASK_TYPES):
+        for j in range(NUM_VMS_PER_TYPE[i]):
+            VMS_PER_TYPE.append(i)
+    if vm_capacity is not None:
+        VM_CAPACITY = vm_capacity
+    if pm_capacity is not None:
+        PM_CAPACITY = pm_capacity
+    # 更新任务配置
+    if task_config is not None:
+        TASK_CONFIG = {}
+        for i in range(NUM_TASK_TYPES):
+            TASK_CONFIG[i] = {
+                "demand": task_config[i]["demand"],
+                "duration": task_config[i]["duration"]
+            }
+    print("环境参数已重置:")
+    print(f"实体机数量: {NUM_PM}, 任务类型数量: {NUM_TASK_TYPES}, 每种任务类型虚拟机数量: {NUM_VMS_PER_TYPE}, 虚拟机映射任务类型: {VMS_PER_TYPE}")
+    print(f"虚拟机容量: {VM_CAPACITY}, 实体机容量: {PM_CAPACITY}")
 
 def prefix_sum(arr):
     result = [0]
@@ -50,15 +85,14 @@ def prefix_sum(arr):
 class CloudEnv:
     def __init__(self):
         # 虚拟机负载（百分比），格式：{虚拟机ID: 当前总负载}
-        self.vm_load = np.zeros(sum(NUM_VMS_PER_TYPE), dtype=float)
+        self.vm_load = np.zeros(len(VMS_PER_TYPE), dtype=float) #sum(NUM_VMS_PER_TYPE) self.prefix_NUM_VMS_PER_TYPE[-1] 都是一样的含义
         # 虚拟机到实体机的映射  todo:到时候需要动态表示
-        self.vm_to_entity = []  # 每个虚拟机对应的实体机ID 假设虚拟机i平铺部署在实体机上
-        for i in range(sum(NUM_VMS_PER_TYPE)):
-            self.vm_to_entity.append(i%NUM_PM) 
-        print("vm_to_entity:", self.vm_to_entity)
-        # self.vm_to_entity = [0,1,2,0,1,2,0,1,2,0,1] 
+        self.vm_to_pm = []  # 每个虚拟机对应的实体机ID 假设虚拟机i平铺部署在实体机上
+        for i in range(len(VMS_PER_TYPE)): # sum(NUM_VMS_PER_TYPE) 
+            self.vm_to_pm.append(i%NUM_PM) 
+        print("vm_to_pm:", self.vm_to_pm) # self.vm_to_pm = [0,1,2,0,1,2,0,1,2,0,1] 
         # 任务队列：记录每个虚拟机中正在执行的任务（剩余步长, 负载）
-        self.task_queues = [deque() for _ in range(sum(NUM_VMS_PER_TYPE))]
+        self.task_queues = [deque() for _ in range(len(VMS_PER_TYPE))]  # sum(NUM_VMS_PER_TYPE)
         # 每种应用类型对应虚拟机数量前缀和
         self.prefix_NUM_VMS_PER_TYPE = prefix_sum(NUM_VMS_PER_TYPE)
         # 初始化轮询指针
@@ -91,10 +125,10 @@ class CloudEnv:
     def get_state(self, task_type):
         #  构建状态：应用类型 + 所有虚拟机负载等级 所有虚拟机的负载等级（按应用类型分组）
         vm_levels = [self._get_vm_level(self.vm_load[i], VMS_PER_TYPE[i]) 
-                    for i in range(sum(NUM_VMS_PER_TYPE))]
+                    for i in range(len(VMS_PER_TYPE))]  # sum(NUM_VMS_PER_TYPE)
         return (task_type,) + tuple(vm_levels)
     
-    def get_all_states(self):
+    def get_all_states(self):  #基本没用于DQN训练,因为是状态空间太大，无法全部枚举和存储，就不能使用遍历所有状态的方法
         """
         枚举所有可能的状态：(task_type, vm_level_0, ..., vm_level_8)
         task_type: 0~NUM_TASK_TYPES-1
@@ -104,18 +138,18 @@ class CloudEnv:
         vm_level_range = list(range(1, 11))  # 1~11
         for task_type in range(NUM_TASK_TYPES):
             # 每台虚拟机有10种level 10的n次方个组合  所以不能用q-learning
-            for vm_levels in itertools.product(vm_level_range, repeat=sum(NUM_VMS_PER_TYPE)):
+            for vm_levels in itertools.product(vm_level_range, repeat=len(VMS_PER_TYPE)): # sum(NUM_VMS_PER_TYPE)
                 state = (task_type,) + vm_levels
                 all_states.append(state)
         return all_states
 
     def set_state(self, state):
         """
-        将环境设置为指定状态（仅设置vm_load，不处理队列）
-        state: (task_type, vm_level_0, ..., vm_level_8)
+        将环境设置为指定状态（仅设置vm_load，不处理队列）  也就是只用于检验某一步状态的效果
+        state: (task_type, vm_level_0, ..., vm_level_3...)
         """
         # 只设置虚拟机负载，task_type不需要设置
-        for i in range(sum(NUM_VMS_PER_TYPE)):
+        for i in range(len(VMS_PER_TYPE)):  # sum(NUM_VMS_PER_TYPE)
             # 反推负载百分比区间的均值
             vm_type = VMS_PER_TYPE[i]
             level = state[i + 1]
@@ -125,11 +159,12 @@ class CloudEnv:
         for q in self.task_queues:
             q.clear()
     
-    def step(self, task_type, vm_id):
+    def step(self, task_type, vm_id): 
+        #  DQN学习过程中使用的step，将每个任务分配到指定虚拟机，并计算奖励
         #  执行动作：分配任务到虚拟机，并处理任务队列
         #  处理任务队列（减少剩余步长）
         released_load = 0
-        for vm in range(sum(NUM_VMS_PER_TYPE)):
+        for vm in range(len(VMS_PER_TYPE)):  # sum(NUM_VMS_PER_TYPE)
             new_queue = deque()
             while self.task_queues[vm]:
                 remain_steps, load = self.task_queues[vm].popleft()
@@ -156,7 +191,7 @@ class CloudEnv:
 
         # 计算奖励
         # 同类型虚拟机的负载方差
-        same_type_vms = [self.vm_load[i] for i in range(sum(NUM_VMS_PER_TYPE))
+        same_type_vms = [self.vm_load[i] for i in range(len(VMS_PER_TYPE)) 
                        if VMS_PER_TYPE[i] == task_type]
         vm_var = np.var(same_type_vms)
         
@@ -165,20 +200,21 @@ class CloudEnv:
         for e in range(NUM_PM):  # 实体机数量
             load = sum(
                 self.vm_load[i] 
-                for i in range(sum(NUM_VMS_PER_TYPE))
-                if self.vm_to_entity[i] == e
+                for i in range(len(VMS_PER_TYPE))  # sum(NUM_VMS_PER_TYPE)
+                if self.vm_to_pm[i] == e
             )
             entity_loads.append(load)
         entity_var = np.var(entity_loads)
         
         # 过载惩罚（任一实体机超载）
-        overload_penalty = overload if any(l > ENTITY_CAPACITY for l in entity_loads) else 0
+        overload_penalty = overload if any(l > PM_CAPACITY for l in entity_loads) else 0
         
         reward = -a * vm_var - b * entity_var - overload_penalty
         return reward, False
     
     def step_batch(self, task_types, agent , choose_function):
         """
+        是检验DQN效果过程中的真实任务到来step,学习过程中是一个个一个任务来，而这里是批量到来，实际上学习过程是更加精细的，批量到来可以看成一个一个来并选择
         批量执行任务分配，不计算奖励，只更新负载和判断过载。
         若选择的虚拟机超载，尝试分配到同类型下不超载的虚拟机，并记录超载虚拟机。
         :param task_types: 任务类型数组，如 [0, 1, 2]
@@ -190,7 +226,7 @@ class CloudEnv:
         #此处引出一个之前忽略的问题  就是我这个选择动作应该放到处理所有虚拟机的任务队列之后  我之前的学习都是放在之前就选完了  先看效果吧
 
         # 1. 处理所有虚拟机的任务队列（减少剩余步长，释放负载）  
-        for vm in range(sum(NUM_VMS_PER_TYPE)):
+        for vm in range(len(VMS_PER_TYPE)):  # sum(NUM_VMS_PER_TYPE)
             new_queue = deque()
             while self.task_queues[vm]:
                 remain_steps, load = self.task_queues[vm].popleft()
@@ -228,7 +264,7 @@ class CloudEnv:
                 # 尝试分配到同类型下其他不超载的虚拟机
                 vm_type = VMS_PER_TYPE[vm_id]
                 # 找到所有同类型虚拟机的ID
-                candidate_vms = [i for i in range(sum(NUM_VMS_PER_TYPE)) if VMS_PER_TYPE[i] == vm_type]
+                candidate_vms = [i for i in range(len(VMS_PER_TYPE)) if VMS_PER_TYPE[i] == vm_type]
                 allocated = False
                 for alt_vm in candidate_vms:
                     if self.vm_load[alt_vm] + task_demand <= VM_CAPACITY[vm_type]:
@@ -246,12 +282,12 @@ class CloudEnv:
             load = sum(
                 self.vm_load[i]
                 for i in range(self.prefix_NUM_VMS_PER_TYPE[-1])
-                if self.vm_to_entity[i] == e
+                if self.vm_to_pm[i] == e
             )
             entity_loads.append(load)
 
         # 4. 判断是否有实体机过载
-        overload_flag = any(l > ENTITY_CAPACITY for l in entity_loads)
+        overload_flag = any(l > PM_CAPACITY for l in entity_loads)
 
         # print("虚拟机资源利用率：")
         vm_utilization = []
@@ -269,14 +305,46 @@ class CloudEnv:
             total_load = sum(
                 self.vm_load[i]
                 for i in range(len(self.vm_load))
-                if self.vm_to_entity[i] == pm_id
+                if self.vm_to_pm[i] == pm_id
             )
-            utilization = total_load / ENTITY_CAPACITY
+            utilization = total_load / PM_CAPACITY
             pm_utilization.append(utilization)
             # print(f"PM {pm_id}: {utilization:.2%}")
             
 
         return self.vm_load.copy(), entity_loads, overload_flag, overload_vms,vm_utilization, pm_utilization
+
+    # 虚拟机负载，资源利用率以及负载方差(同种类型虚拟机)
+    def get_vm_info(self):
+        vm_utilization = []
+        vm_var = [[] for _ in range(NUM_TASK_TYPES)]  # 每种应用类型虚拟机负载方差
+        for i in range(len(self.vm_load)):
+            vm_type = VMS_PER_TYPE[i]
+            utilization = self.vm_load[i] / VM_CAPACITY[vm_type]
+            vm_utilization.append(utilization)
+        for task_type in range(NUM_TASK_TYPES):
+            start = self.prefix_NUM_VMS_PER_TYPE[task_type]
+            end = self.prefix_NUM_VMS_PER_TYPE[task_type+1]
+            vm_var[task_type].append(np.var(self.vm_load[start:end]))
+        return self.vm_load.copy(),vm_utilization,vm_var
+
+    # 实体机负载，资源利用率以及负载方差
+    def get_pm_info(self):
+        pm_utilization = []
+        pm_loads = []
+        for pm_id in range(NUM_PM):
+            # 统计该实体机上所有虚拟机的负载总和
+            total_load = sum(
+                self.vm_load[i]
+                for i in range(len(self.vm_load))
+                if self.vm_to_pm[i] == pm_id
+            )
+            utilization = total_load / PM_CAPACITY
+            pm_utilization.append(utilization)
+            pm_loads.append(total_load)
+        pm_var = np.var(pm_loads)
+        return pm_loads,pm_utilization, pm_var
+        
 
     def reset(self):
         self.vm_load.fill(0)

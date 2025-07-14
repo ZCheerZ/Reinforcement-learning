@@ -58,7 +58,7 @@ def evaluate_with_same_tasks(agent, episodes=500):
             load = sum(
                 env_q.vm_load[i]
                 for i in range(env_q.prefix_NUM_VMS_PER_TYPE[-1])
-                if env_q.vm_to_entity[i] == e
+                if env_q.vm_to_pm[i] == e
             )
             entity_loads.append(load)
         entity_var_q.append(np.var(entity_loads))
@@ -91,7 +91,7 @@ def evaluate_with_same_tasks(agent, episodes=500):
             load = sum(
                 env_r.vm_load[i]
                 for i in range(env_r.prefix_NUM_VMS_PER_TYPE[-1])
-                if env_r.vm_to_entity[i] == e
+                if env_r.vm_to_pm[i] == e
             )
             entity_loads.append(load)
         entity_var_random.append(np.var(entity_loads))
@@ -126,7 +126,7 @@ def evaluate_with_same_tasks(agent, episodes=500):
             load = sum(
                 env_rr.vm_load[i]
                 for i in range(env_rr.prefix_NUM_VMS_PER_TYPE[-1])
-                if env_rr.vm_to_entity[i] == e
+                if env_rr.vm_to_pm[i] == e
             )
             entity_loads.append(load)
         entity_var_rr.append(np.var(entity_loads))

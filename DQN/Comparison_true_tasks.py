@@ -3,6 +3,7 @@ import random
 import torch
 from collections import defaultdict
 import matplotlib.pyplot as plt  # 用于绘图
+import model_definition
 from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYPE, NUM_PM
 
 
@@ -15,7 +16,7 @@ def load_agent_from_file(policy_net_path="DQN/model/policy_net(2423).pth"):
     print("模型已从",policy_net_path,"加载")
     return agent
 
-def get_task_sequence(episodes=10, max_tasks=5):
+def get_task_sequence(episodes=10, max_tasks=3):
     """
     生成一批任务序列（每一周期的任务类型序列）
     :param max_tasks: 一个时隙内有多少个任务数
@@ -26,7 +27,7 @@ def get_task_sequence(episodes=10, max_tasks=5):
     all_task_types = []
     with open("DQN/task_sequence.txt", "w") as f:
         for _ in range(episodes):
-            task_types = [random.randint(0, NUM_TASK_TYPES-1) for _ in range(max_tasks)]
+            task_types = [random.randint(0, NUM_TASK_TYPES-1) for _ in range(random.randint(1, max_tasks))]
             f.write(" ".join(map(str, task_types)) + "\n")
             all_task_types.append(task_types)
     # 将all_task_types 写到txt文件中
@@ -47,6 +48,35 @@ def get_task_sequence_from_file(file_path):
             all_task_types.append(task_types)
     print("从文件中读取的任务序列：", all_task_types)
     return all_task_types
+
+def evaluate_performance(all_task_types,choose_function, T=100,agent= None):
+    """
+    用同一批任务序列分别评估Q-learning、随机分配和轮询分配的负载均衡效果
+    :param all_task_types: 任务类型序列
+    :param choose_function: 选择函数（DQN、Random、RR）
+    :param T: 评估轮数
+    :param agent: 已训练好的 QLearningAgent
+    :return: (vm_var, pm_var)
+    """
+    env = CloudEnv()
+    vm_var, pm_var = [[] for _ in range(NUM_TASK_TYPES)], []
+    env.reset()
+    
+    for t in range(T):
+        vm_load, pm_loads, overload_flag, overload_vms,vm_utilization, pm_utilization = env.step_batch(all_task_types[t], agent, choose_function=choose_function)
+        # 记录每种类型虚拟机的负载方差
+        for task_type in range(NUM_TASK_TYPES):
+            start = env.prefix_NUM_VMS_PER_TYPE[task_type]
+            end = env.prefix_NUM_VMS_PER_TYPE[task_type+1]
+            vm_var[task_type].append(np.var(vm_load[start:end]))
+        # print("env.vm_load:", env.vm_load)
+        # 记录实体机方差
+        pm_var.append(np.var(pm_loads))
+        if(overload_flag): 
+            print(f"{choose_function} Episode {t} has overload VMs: {overload_vms}")
+    
+    return vm_var, pm_var,vm_utilization, pm_utilization
+
 
 
 def evaluate_with_true_tasks(agent, episodes=100):
@@ -133,7 +163,7 @@ def evaluate():
     # 用真实任务序列评估
     vm_var_q, entity_var_q,vm__utilization_q,pm__utilization_q,\
             vm_var_random, entity_var_random,vm__utilization_random,pm__utilization_random,\
-            vm_var_rr, entity_var_rr,vm__utilization_rr,pm__utilization_rr = evaluate_with_true_tasks(agent, episodes=10)
+            vm_var_rr, entity_var_rr,vm__utilization_rr,pm__utilization_rr = evaluate_with_true_tasks(agent, episodes=500)
 
     # vm_var_q, entity_var_q, vm_var_rr, entity_var_rr= evaluate_with_true_tasks(agent, episodes=100)
 
@@ -165,10 +195,10 @@ def evaluate():
     print(f"DQN:       {0.4*np.mean(vm_var_q) + 0.5*avg_entity_var_q:.4f}")
     print(f"Random:    {0.4*np.mean(avg_vm_var_random) + 0.5*avg_entity_var_random:.4f}")
     print(f"RR:        {0.4*np.mean(avg_vm_var_rr) + 0.5*avg_entity_var_rr:.4f}")
-    print("--------------------------------------")
-    print("各算法每种应用类型虚拟机平均利用率：")
-    for i in range(sum(NUM_VMS_PER_TYPE)):
-        print(f"VM {i} - DQN: {np.mean(vm__utilization_q[i]):.4f}, Random: {np.mean(vm__utilization_random[i]):.4f}, RR: {np.mean(vm__utilization_rr[i]):.4f}")
+    # print("--------------------------------------")
+    # print("各算法每种应用类型虚拟机平均利用率：")
+    # for i in range(sum(NUM_VMS_PER_TYPE)):
+    #     print(f"VM {i} - DQN: {np.mean(vm__utilization_q[i]):.4f}, Random: {np.mean(vm__utilization_random[i]):.4f}, RR: {np.mean(vm__utilization_rr[i]):.4f}")
     print("--------------------------------------")
     print("各算法每种应用类型实体机平均利用率：")
     for i in range(NUM_PM):
@@ -204,5 +234,8 @@ def evaluate():
     plt.tight_layout()
     plt.show()
 
+
+# model_definition.NUM_PM = 9  #根据这个来改  到时候model_definition.py里对应有个一改而改的操作函数  类似工具函数
+# model_definition.env_params_reset(num_pm=6, num_task_types=3,num_vms_per_type=[2,2,2])  # 重置环境参数
 evaluate()
 # get_task_sequence_from_file("DQN/task_sequence.txt")
