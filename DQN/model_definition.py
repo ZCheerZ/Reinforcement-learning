@@ -221,7 +221,8 @@ class CloudEnv:
         :param agent:      DQNAgent 实例，用于获取动作
         :return: (vm_load, entity_loads, overload_flag, overload_vms)
         """
-        overload_vms = []  # 记录本次尝试分配时超载的虚拟机ID
+        # overload_vms = []  # 记录本次尝试分配时超载的虚拟机ID
+        overload_nums = 0  # 记录违规次数
 
         #此处引出一个之前忽略的问题  就是我这个选择动作应该放到处理所有虚拟机的任务队列之后  我之前的学习都是放在之前就选完了  先看效果吧
 
@@ -260,7 +261,7 @@ class CloudEnv:
                 self.vm_load[vm_id] += task_demand
                 self.task_queues[vm_id].append((task_duration, task_demand))
             else:
-                overload_vms.append(vm_id)
+                # overload_vms.append(vm_id)
                 # 尝试分配到同类型下其他不超载的虚拟机
                 vm_type = VMS_PER_TYPE[vm_id]
                 # 找到所有同类型虚拟机的ID
@@ -274,50 +275,28 @@ class CloudEnv:
                         print(f"Task type {task_type} allocated to VM {alt_vm} instead of overloaded VM {vm_id}.")
                         break
                 # 如果所有同类型虚拟机都超载，则该任务不分配
+                if not allocated:
+                    overload_nums += 1
+
    
+        pm_loads,pm_utilization, pm_var = self.get_pm_info()  # 获取实体机负载信息
 
-        # 3. 统计实体机负载
-        entity_loads = []
-        for e in range(NUM_PM):
-            load = sum(
-                self.vm_load[i]
-                for i in range(self.prefix_NUM_VMS_PER_TYPE[-1])
-                if self.vm_to_pm[i] == e
-            )
-            entity_loads.append(load)
+        # 3. 判断是否有实体机过载
+        overload_flag = any(l > PM_CAPACITY for l in pm_loads)
+        if overload_flag:
+            print("Overload detected! Entity machine load exceeds capacity.")
+            overload_nums += 1
+            for pm_id, load in enumerate(pm_loads):
+                if load > PM_CAPACITY:
+                    print(f"Entity machine {pm_id} overloaded with load {load}.")
 
-        # 4. 判断是否有实体机过载
-        overload_flag = any(l > PM_CAPACITY for l in entity_loads)
 
-        # print("虚拟机资源利用率：")
-        vm_utilization = []
-        for i in range(len(self.vm_load)):
-            vm_type = VMS_PER_TYPE[i]
-            utilization = self.vm_load[i] / VM_CAPACITY[vm_type]
-            # print(f"VM {i} (Type {vm_type}): {utilization:.2%}")
-            vm_utilization.append(utilization)
-
-        # 输出每个实体机的资源利用率
-        # print("实体机资源利用率：")
-        pm_utilization = []
-        for pm_id in range(NUM_PM):
-            # 统计该实体机上所有虚拟机的负载总和
-            total_load = sum(
-                self.vm_load[i]
-                for i in range(len(self.vm_load))
-                if self.vm_to_pm[i] == pm_id
-            )
-            utilization = total_load / PM_CAPACITY
-            pm_utilization.append(utilization)
-            # print(f"PM {pm_id}: {utilization:.2%}")
-            
-
-        return self.vm_load.copy(), entity_loads, overload_flag, overload_vms,vm_utilization, pm_utilization
+        return overload_flag, overload_nums
 
     # 虚拟机负载，资源利用率以及负载方差(同种类型虚拟机)
     def get_vm_info(self):
         vm_utilization = []
-        vm_var = [[] for _ in range(NUM_TASK_TYPES)]  # 每种应用类型虚拟机负载方差
+        vm_var = []  # 每种应用类型虚拟机负载方差
         for i in range(len(self.vm_load)):
             vm_type = VMS_PER_TYPE[i]
             utilization = self.vm_load[i] / VM_CAPACITY[vm_type]
@@ -325,7 +304,7 @@ class CloudEnv:
         for task_type in range(NUM_TASK_TYPES):
             start = self.prefix_NUM_VMS_PER_TYPE[task_type]
             end = self.prefix_NUM_VMS_PER_TYPE[task_type+1]
-            vm_var[task_type].append(np.var(self.vm_load[start:end]))
+            vm_var.append(np.var(self.vm_load[start:end]))
         return self.vm_load.copy(),vm_utilization,vm_var
 
     # 实体机负载，资源利用率以及负载方差

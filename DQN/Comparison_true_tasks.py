@@ -4,12 +4,14 @@ import torch
 from collections import defaultdict
 import matplotlib.pyplot as plt  # 用于绘图
 import model_definition
-from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYPE, NUM_PM
+from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYPE, NUM_PM 
+# todo : 这里的NUM_TASK_TYPES, NUM_VMS_PER_TYPE, NUM_PM 都是从model_definition.py里导入的 应该统一变为model_definition.xxx
+# todo : 把evaluate_with_true_tasks换了 冗余代码太多  还有模型定义以及这里的获取信息代码也需要更换
 
 
 def load_agent_from_file(policy_net_path="DQN/model/policy_net(2423).pth"):
-    state_dim = 1 + sum(NUM_VMS_PER_TYPE)  # 状态维度
-    action_dim = max(NUM_VMS_PER_TYPE)  # 动作维度
+    state_dim = 1 + sum(model_definition.NUM_VMS_PER_TYPE)  # 状态维度
+    action_dim = max(model_definition.NUM_VMS_PER_TYPE)  # 动作维度
     agent = DQNAgent(state_dim, action_dim)
     agent.policy_net.load_state_dict(torch.load(policy_net_path,weights_only=True))
     # agent.policy_net.eval()  # 设置为评估模式（可选）
@@ -27,7 +29,7 @@ def get_task_sequence(episodes=10, max_tasks=3):
     all_task_types = []
     with open("DQN/task_sequence.txt", "w") as f:
         for _ in range(episodes):
-            task_types = [random.randint(0, NUM_TASK_TYPES-1) for _ in range(random.randint(1, max_tasks))]
+            task_types = [random.randint(0, model_definition.NUM_TASK_TYPES-1) for _ in range(random.randint(1, max_tasks))]
             f.write(" ".join(map(str, task_types)) + "\n")
             all_task_types.append(task_types)
     # 将all_task_types 写到txt文件中
@@ -59,27 +61,28 @@ def evaluate_performance(all_task_types,choose_function, T=100,agent= None):
     :return: (vm_var, pm_var)
     """
     env = CloudEnv()
-    vm_var, pm_var = [[] for _ in range(NUM_TASK_TYPES)], []
     env.reset()
-    
+    vm_vars, pm_vars = [[] for _ in range(model_definition.NUM_TASK_TYPES)], []
+    vm_utilizations,pm_utilizations = [[] for _ in range(sum(model_definition.NUM_VMS_PER_TYPE))], [[] for _ in range(model_definition.NUM_PM)]
     for t in range(T):
-        vm_load, pm_loads, overload_flag, overload_vms,vm_utilization, pm_utilization = env.step_batch(all_task_types[t], agent, choose_function=choose_function)
+        overload_flag,overload_nums = env.step_batch(all_task_types[t], agent, choose_function=choose_function)
         # 记录每种类型虚拟机的负载方差
-        for task_type in range(NUM_TASK_TYPES):
-            start = env.prefix_NUM_VMS_PER_TYPE[task_type]
-            end = env.prefix_NUM_VMS_PER_TYPE[task_type+1]
-            vm_var[task_type].append(np.var(vm_load[start:end]))
-        # print("env.vm_load:", env.vm_load)
-        # 记录实体机方差
-        pm_var.append(np.var(pm_loads))
-        if(overload_flag): 
-            print(f"{choose_function} Episode {t} has overload VMs: {overload_vms}")
+        pm_loads,pm_utilization,pm_var = env.get_pm_info()  # 更新实体机负载信息
+        vm_loads,vm_utilization,vm_var = env.get_vm_info()  # 更新虚拟机负载信息
+        for task_type in range(model_definition.NUM_TASK_TYPES):
+            vm_vars[task_type].append(vm_var[task_type])
+        pm_vars.append(pm_var)
+        for pm_id in range(model_definition.NUM_PM):
+            pm_utilizations[pm_id].append(pm_utilization[pm_id])
+        for i in range(len(vm_utilization)):
+            vm_utilizations[i].append(vm_utilization[i])
     
-    return vm_var, pm_var,vm_utilization, pm_utilization
+    
+    return vm_vars, pm_vars,vm_utilizations, pm_utilizations
 
 
 
-def evaluate_with_true_tasks(agent, episodes=100):
+# def evaluate_with_true_tasks(agent, episodes=100):
     """
     用同一批任务序列分别评估Q-learning、随机分配和轮询分配的负载均衡效果
     :param agent: 已训练好的 QLearningAgent
@@ -91,12 +94,12 @@ def evaluate_with_true_tasks(agent, episodes=100):
     print("生成的第一轮任务序列：", all_task_types)
     # 2. DQN评估
     env_q = CloudEnv()
-    vm_var_q, entity_var_q,vm__utilization_q,pm__utilization_q =  [[] for _ in range(NUM_TASK_TYPES)], [], [[] for _ in range(sum(NUM_VMS_PER_TYPE))], [[] for _ in range(NUM_PM)]
+    vm_var_q, entity_var_q,vm__utilization_q,pm__utilization_q =  [[] for _ in range(model_definition.NUM_TASK_TYPES)], [], [[] for _ in range(sum(model_definition.NUM_VMS_PER_TYPE))], [[] for _ in range(model_definition.NUM_PM)]
     env_q.reset()
     for ep in range(episodes):
         vm_load, entity_loads, overload_flag, overload_vms,vm_utilization, pm_utilization  = env_q.step_batch(all_task_types[ep], agent, choose_function="DQN")
         # 记录每种类型虚拟机的负载方差
-        for task_type in range(NUM_TASK_TYPES):
+        for task_type in range(model_definition.NUM_TASK_TYPES):
             start = env_q.prefix_NUM_VMS_PER_TYPE[task_type]
             end = env_q.prefix_NUM_VMS_PER_TYPE[task_type+1]
             vm_var_q[task_type].append(np.var(vm_load[start:end]))
@@ -112,12 +115,12 @@ def evaluate_with_true_tasks(agent, episodes=100):
 
     # 3. 随机分配评估（用同样的任务序列）
     env_r = CloudEnv()
-    vm_var_random, entity_var_random,vm__utilization_random,pm__utilization_random =  [[] for _ in range(NUM_TASK_TYPES)], [], [[] for _ in range(sum(NUM_VMS_PER_TYPE))], [[] for _ in range(NUM_PM)]
+    vm_var_random, entity_var_random,vm__utilization_random,pm__utilization_random =  [[] for _ in range(model_definition.NUM_TASK_TYPES)], [], [[] for _ in range(sum(model_definition.NUM_VMS_PER_TYPE))], [[] for _ in range(model_definition.NUM_PM)]
     env_r.reset()
     for ep in range(episodes):
         vm_load, entity_loads, overload_flag, overload_vms,vm_utilization, pm_utilization  = env_r.step_batch(all_task_types[ep], agent= None, choose_function="Random")
         # 记录每种类型虚拟机的负载方差
-        for task_type in range(NUM_TASK_TYPES):
+        for task_type in range(model_definition.NUM_TASK_TYPES):
             start = env_r.prefix_NUM_VMS_PER_TYPE[task_type]
             end = env_r.prefix_NUM_VMS_PER_TYPE[task_type+1]
             vm_var_random[task_type].append(np.var(vm_load[start:end]))
@@ -133,12 +136,12 @@ def evaluate_with_true_tasks(agent, episodes=100):
 
     # 4. 轮询分配评估（用同样的任务序列）
     env_rr = CloudEnv()
-    vm_var_rr, entity_var_rr ,vm__utilization_rr,pm__utilization_rr =  [[] for _ in range(NUM_TASK_TYPES)], [],[[] for _ in range(sum(NUM_VMS_PER_TYPE))], [[] for _ in range(NUM_PM)]
+    vm_var_rr, entity_var_rr ,vm__utilization_rr,pm__utilization_rr =  [[] for _ in range(model_definition.NUM_TASK_TYPES)], [],[[] for _ in range(sum(model_definition.NUM_VMS_PER_TYPE))], [[] for _ in range(model_definition.NUM_PM)]
     env_rr.reset()
     for ep in range(episodes):
         vm_load, entity_loads, overload_flag, overload_vms,vm_avg_utilization, pm_avg_utilization  = env_rr.step_batch(all_task_types[ep], agent = None, choose_function="RR")
         # 记录每种类型虚拟机的负载方差
-        for task_type in range(NUM_TASK_TYPES):
+        for task_type in range(model_definition.NUM_TASK_TYPES):
             start = env_rr.prefix_NUM_VMS_PER_TYPE[task_type]
             end = env_rr.prefix_NUM_VMS_PER_TYPE[task_type+1]
             vm_var_rr[task_type].append(np.var(vm_load[start:end]))
@@ -161,17 +164,21 @@ def evaluate():
     agent = load_agent_from_file()
 
     # 用真实任务序列评估
-    vm_var_q, entity_var_q,vm__utilization_q,pm__utilization_q,\
-            vm_var_random, entity_var_random,vm__utilization_random,pm__utilization_random,\
-            vm_var_rr, entity_var_rr,vm__utilization_rr,pm__utilization_rr = evaluate_with_true_tasks(agent, episodes=500)
+    # vm_var_q, entity_var_q,vm__utilization_q,pm__utilization_q,\
+    #         vm_var_random, entity_var_random,vm__utilization_random,pm__utilization_random,\
+    #         vm_var_rr, entity_var_rr,vm__utilization_rr,pm__utilization_rr = evaluate_with_true_tasks(agent, episodes=1000)\
+    T = 500
+    all_task_types = get_task_sequence(episodes=T, max_tasks=5)
+    vm_var_q, entity_var_q,vm__utilization_q,pm__utilization_q = evaluate_performance(all_task_types, choose_function="DQN", T=T, agent=agent)
+    vm_var_random, entity_var_random,vm__utilization_random,pm__utilization_random = evaluate_performance(all_task_types, choose_function="Random", T=T, agent=None)
+    vm_var_rr, entity_var_rr,vm__utilization_rr,pm__utilization_rr = evaluate_performance(all_task_types, choose_function="RR", T=T, agent=None)
 
-    # vm_var_q, entity_var_q, vm_var_rr, entity_var_rr= evaluate_with_true_tasks(agent, episodes=100)
 
 
     # 计算每种类型虚拟机方差的均值
-    avg_vm_var_q = [np.mean(vm_var_q[i]) for i in range(NUM_TASK_TYPES)]
-    avg_vm_var_random = [np.mean(vm_var_random[i]) for i in range(NUM_TASK_TYPES)]
-    avg_vm_var_rr = [np.mean(vm_var_rr[i]) for i in range(NUM_TASK_TYPES)]
+    avg_vm_var_q = [np.mean(vm_var_q[i]) for i in range(model_definition.NUM_TASK_TYPES)]
+    avg_vm_var_random = [np.mean(vm_var_random[i]) for i in range(model_definition.NUM_TASK_TYPES)]
+    avg_vm_var_rr = [np.mean(vm_var_rr[i]) for i in range(model_definition.NUM_TASK_TYPES)]
     avg_entity_var_q = np.mean(entity_var_q)
     avg_entity_var_random = np.mean(entity_var_random)
     avg_entity_var_rr = np.mean(entity_var_rr)
@@ -183,7 +190,7 @@ def evaluate():
     avg_pm_utilization_rr = np.mean([np.mean(pm__utilization_rr[i]) for i in range(len(pm__utilization_rr))])   
     # print("--------------------------------------")
     print("各算法每种应用类型虚拟机负载方差均值：")
-    for i in range(NUM_TASK_TYPES):
+    for i in range(model_definition.NUM_TASK_TYPES):
         print(f"Type {i} - DQN: {avg_vm_var_q[i]:.4f}, Random: {avg_vm_var_random[i]:.4f}, RR: {avg_vm_var_rr[i]:.4f}")
     print("--------------------------------------")
     print("各算法实体机负载方差均值：")
@@ -195,20 +202,20 @@ def evaluate():
     print(f"DQN:       {0.4*np.mean(vm_var_q) + 0.5*avg_entity_var_q:.4f}")
     print(f"Random:    {0.4*np.mean(avg_vm_var_random) + 0.5*avg_entity_var_random:.4f}")
     print(f"RR:        {0.4*np.mean(avg_vm_var_rr) + 0.5*avg_entity_var_rr:.4f}")
-    # print("--------------------------------------")
-    # print("各算法每种应用类型虚拟机平均利用率：")
-    # for i in range(sum(NUM_VMS_PER_TYPE)):
-    #     print(f"VM {i} - DQN: {np.mean(vm__utilization_q[i]):.4f}, Random: {np.mean(vm__utilization_random[i]):.4f}, RR: {np.mean(vm__utilization_rr[i]):.4f}")
+    print("--------------------------------------")
+    print("各算法每种应用类型虚拟机平均利用率：")
+    for i in range(sum(model_definition.NUM_VMS_PER_TYPE)):
+        print(f"VM {i} - DQN: {np.mean(vm__utilization_q[i]):.4f}, Random: {np.mean(vm__utilization_random[i]):.4f}, RR: {np.mean(vm__utilization_rr[i]):.4f}")
     print("--------------------------------------")
     print("各算法每种应用类型实体机平均利用率：")
-    for i in range(NUM_PM):
+    for i in range(model_definition.NUM_PM):
         print(f"PM {i} - DQN: {np.mean(pm__utilization_q[i]):.4f}, Random: {np.mean(pm__utilization_random[i]):.4f}, RR: {np.mean(pm__utilization_rr[i]):.4f}")
 
 
     # 绘图
     plt.figure(figsize=(15,8))
     # 虚拟机负载方差（每种类型单独画线）
-    for i in range(NUM_TASK_TYPES):
+    for i in range(model_definition.NUM_TASK_TYPES):
         plt.subplot(3,2,i+1)
         plt.plot(vm_var_q[i], label=f"DQN Type {i}")
         plt.plot(vm_var_random[i], '--', label=f"Random Type {i}")
