@@ -48,12 +48,16 @@ def get_task_sequence_from_file(file_path):
     :return: all_task_types
     """
     all_task_types = []
+    total_nums = 0
+    T = 0
     with open(file_path, 'r') as f:
         for line in f:
             task_types = list(map(int, line.strip().split()))
+            total_nums += len(task_types)
+            T += 1
             all_task_types.append(task_types)
     print("从文件中读取的任务序列：", all_task_types)
-    return all_task_types
+    return all_task_types, total_nums, T
 
 def evaluate_performance(all_task_types,choose_function, T=100,agent= None):
     """
@@ -173,7 +177,7 @@ def evaluate():
     #         vm_var_random, entity_var_random,vm__utilization_random,pm__utilization_random,\
     #         vm_var_rr, entity_var_rr,vm__utilization_rr,pm__utilization_rr = evaluate_with_true_tasks(agent, episodes=1000)\
     T = 500
-    all_task_types = get_task_sequence(episodes=T, max_tasks=8)
+    all_task_types = get_task_sequence(episodes=T, max_tasks=1)
     vm_var_q, entity_var_q,vm__utilization_q,pm__utilization_q = evaluate_performance(all_task_types, choose_function="DQN", T=T, agent=agent)
     vm_var_random, entity_var_random,vm__utilization_random,pm__utilization_random = evaluate_performance(all_task_types, choose_function="Random", T=T, agent=None)
     vm_var_rr, entity_var_rr,vm__utilization_rr,pm__utilization_rr = evaluate_performance(all_task_types, choose_function="RR", T=T, agent=None)
@@ -252,16 +256,17 @@ def comparison_():
     比较dp+DQN、padding+轮询分配的负载均衡效果
     :return: None
     """
-    T = 500
+    T = 10
     # 1. 生成所有任务序列（每一轮的任务类型序列）
-    all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=6)
+    # all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=4)
+    all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt")
     # print("生成的第一轮任务序列：", all_task_types)
     # 2. DQN评估
     agent = load_agent_from_file()
     vm_var_q, entity_var_q,vm__utilization_q,pm__utilization_q,overload_nums_q = evaluate_performance(all_task_types, choose_function="DQN", T=T, agent=agent)
-    model_definition.env_params_reset(num_pm=5,num_vms_per_type=[5,5,5])  # 重置环境参数
+    # model_definition.env_params_reset(num_pm=5,num_vms_per_type=[5,5,5])  # 重置环境参数
     vm_var_rr, entity_var_rr,vm__utilization_rr,pm__utilization_rr,overload_nums_rr = evaluate_performance(all_task_types, choose_function="RR", T=T, agent=None)
-    
+    # vm_var_random, entity_var_random,vm__utilization_random,pm__utilization_random,overload_nums_random = evaluate_performance(all_task_types, choose_function="Random", T=T, agent=None)
     # 计算每种类型虚拟机方差的均值
     avg_vm_var_q = [np.mean(vm_var_q[i]) for i in range(model_definition.NUM_TASK_TYPES)]
     avg_vm_var_rr = [np.mean(vm_var_rr[i]) for i in range(model_definition.NUM_TASK_TYPES)]
@@ -277,18 +282,18 @@ def comparison_():
     print(f"RR:        {avg_entity_var_rr:.4f}")
     print("--------------------------------------")
     print("多目标加权后各算法对比值：")
-    print(f"DQN:       {0.4*np.mean(vm_var_q) + 0.5*avg_entity_var_q:.4f}")
-    print(f"RR:        {0.4*np.mean(avg_vm_var_rr) + 0.5*avg_entity_var_rr:.4f}")
+    print(f"DQN:       {0.3*np.mean(vm_var_q) + 0.7*avg_entity_var_q:.4f}")
+    print(f"RR:        {0.3*np.mean(avg_vm_var_rr) + 0.7*avg_entity_var_rr:.4f}")
     # print("--------------------------------------")
     # print("各算法每种应用类型虚拟机平均利用率：")
     # for i in range(sum(model_definition.NUM_VMS_PER_TYPE)):
     #     print(f"VM {i} - DQN: {np.mean(vm__utilization_q[i]):.4f}, RR: {np.mean(vm__utilization_rr[i]):.4f}")
-    print("--------------------------------------")
-    print("各算法每种应用类型实体机平均利用率：")
-    for i in range(len(pm__utilization_q)): 
-        print(f"PM {i} - DQN: {np.mean(pm__utilization_q[i]):.4f}")
-    for i in range(len(pm__utilization_rr)): 
-        print(f"PM {i} - RR: {np.mean(pm__utilization_rr[i]):.4f}")
+    # print("--------------------------------------")
+    # print("各算法每种应用类型实体机平均利用率：")
+    # for i in range(len(pm__utilization_q)): 
+    #     print(f"PM {i} - DQN: {np.mean(pm__utilization_q[i]):.4f}")
+    # for i in range(len(pm__utilization_rr)): 
+    #     print(f"PM {i} - RR: {np.mean(pm__utilization_rr[i]):.4f}")
     print("--------------------------------------")
     print("各算法违规率：")
     print(f"DQN:       {overload_nums_q/total_nums:.4f}")
@@ -298,5 +303,5 @@ def comparison_():
 
 # model_definition.NUM_PM = 9  #根据这个来改  到时候model_definition.py里对应有个一改而改的操作函数  类似工具函数
 # model_definition.env_params_reset(num_pm=6, num_task_types=3,num_vms_per_type=[2,2,2])  # 重置环境参数
-comparison_()
-# get_task_sequence_from_file("DQN/task_sequence.txt")
+# comparison_()
+all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt")

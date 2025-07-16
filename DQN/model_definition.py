@@ -28,9 +28,9 @@ for i in range(NUM_TASK_TYPES):
 # print("VMS_PER_TYPE:", VMS_PER_TYPE)
 NUM_PM = 3  # 实体机数量
 TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为了使得离散值都能覆盖到 训练的时候可以把duration拉长以覆盖更多，实际用的时候用实际值
-    0: {"demand": 10, "duration": 10},  # 类型0: 需求10%，持续8步长
-    1: {"demand": 20, "duration": 10},  # 类型1: 需求10%，持续9步长
-    2: {"demand": 30, "duration": 10},  # 类型2: 需求10%，持续7步长
+    0: {"demand": 1, "duration": 5},  # 类型0: 需求10%，持续8步长
+    1: {"demand": 2, "duration": 5},  # 类型1: 需求10%，持续9步长
+    2: {"demand": 3, "duration": 5},  # 类型2: 需求10%，持续7步长
     # 3: {"demand": 10, "duration": 10},  # 类型2: 需求10%，持续7步长
 
 }
@@ -101,26 +101,32 @@ class CloudEnv:
     def _get_vm_level(self, load, vm_type):
         rate = load / VM_CAPACITY[vm_type] *100  # 获取对应虚拟机的容量比率
         # 将负载百分比转换为离散等级（1/2/3.../10）
-        if rate < 10:
-            return 1
-        elif 10 <= rate < 20:
-            return 2
-        elif 20 <= load < 30:
-            return 3
-        elif 30 <= load < 40:
-            return 4
-        elif 40 <= load < 50:
-            return 5
-        elif 50 <= load < 60:
-            return 6
-        elif 60 <= load < 70:
-            return 7
-        elif 70 <= load < 80:
-            return 8
-        elif 80 <= load < 90:
-            return 9
-        else:
-            return 10
+        level = int(rate // 2) + 1
+        if level < 1:
+            level = 1
+        elif level > 50:
+            level = 50
+        return level
+        # if rate < 10:
+        #     return 1
+        # elif 10 <= rate < 20:
+        #     return 2
+        # elif 20 <= load < 30:
+        #     return 3
+        # elif 30 <= load < 40:
+        #     return 4
+        # elif 40 <= load < 50:
+        #     return 5
+        # elif 50 <= load < 60:
+        #     return 6
+        # elif 60 <= load < 70:
+        #     return 7
+        # elif 70 <= load < 80:
+        #     return 8
+        # elif 80 <= load < 90:
+        #     return 9
+        # else:
+        #     return 10
         
     def get_state(self, task_type):
         #  构建状态：应用类型 + 所有虚拟机负载等级 所有虚拟机的负载等级（按应用类型分组）
@@ -135,7 +141,7 @@ class CloudEnv:
         vm_level: 1~10
         """
         all_states = []
-        vm_level_range = list(range(1, 11))  # 1~11
+        vm_level_range = list(range(1, 51))  # 1~11
         for task_type in range(NUM_TASK_TYPES):
             # 每台虚拟机有10种level 10的n次方个组合  所以不能用q-learning
             for vm_levels in itertools.product(vm_level_range, repeat=len(VMS_PER_TYPE)): # sum(NUM_VMS_PER_TYPE)
