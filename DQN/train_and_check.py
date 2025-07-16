@@ -10,7 +10,7 @@ from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYP
 EPSILON = 0.2
 EPSILON_DECAY = 0.995
 MIN_EPSILON = 0.01
-EPISODES = 3000
+EPISODES = 1500
 MAX_STEPS = 1024
 
 
@@ -84,7 +84,7 @@ def train_test():
     plt.show()
 
     # 保存模型
-    file_path = "DQN/model/policy_net(2423).pth"
+    file_path = "DQN/model/policy_net(244).pth"
     torch.save(agent.policy_net.state_dict(), file_path)
     print("模型已保存到", file_path)
 

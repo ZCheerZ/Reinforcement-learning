@@ -19,8 +19,8 @@ b = 0.5
 overload = 10000
 
 # 环境参数
-NUM_TASK_TYPES = 4  # 应用类型数量
-NUM_VMS_PER_TYPE = [2,4,2,3]  # 每种应用类型有多少台虚拟机 VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3] 
+NUM_TASK_TYPES = 3  # 应用类型数量
+NUM_VMS_PER_TYPE = [2,4,4]  # 每种应用类型有多少台虚拟机 VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3] 
 VMS_PER_TYPE = [] # 每台虚拟机到应用类型的映射
 for i in range(NUM_TASK_TYPES):
     for j in range(NUM_VMS_PER_TYPE[i]):
@@ -29,13 +29,13 @@ for i in range(NUM_TASK_TYPES):
 NUM_PM = 3  # 实体机数量
 TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为了使得离散值都能覆盖到 训练的时候可以把duration拉长以覆盖更多，实际用的时候用实际值
     0: {"demand": 10, "duration": 10},  # 类型0: 需求10%，持续8步长
-    1: {"demand": 10, "duration": 10},  # 类型1: 需求10%，持续9步长
-    2: {"demand": 10, "duration": 10},  # 类型2: 需求10%，持续7步长
-    3: {"demand": 10, "duration": 10},  # 类型2: 需求10%，持续7步长
+    1: {"demand": 20, "duration": 10},  # 类型1: 需求10%，持续9步长
+    2: {"demand": 30, "duration": 10},  # 类型2: 需求10%，持续7步长
+    # 3: {"demand": 10, "duration": 10},  # 类型2: 需求10%，持续7步长
 
 }
-VM_CAPACITY = [100,100,100,100]  # 虚拟机容量，执行不同应用类型任务的虚拟机资源容量
-PM_CAPACITY = 200  # 实体机容量（300%）
+VM_CAPACITY = [100,100,100]  # 虚拟机容量，执行不同应用类型任务的虚拟机资源容量
+PM_CAPACITY = 300  # 实体机容量（300%）
 
 def env_params_reset(num_pm=None, num_task_types=None, num_vms_per_type=None, task_config=None, vm_capacity=None, pm_capacity=None):
     """
@@ -272,7 +272,7 @@ class CloudEnv:
                         self.vm_load[alt_vm] += task_demand
                         self.task_queues[alt_vm].append((task_duration, task_demand))
                         allocated = True
-                        print(f"Task type {task_type} allocated to VM {alt_vm} instead of overloaded VM {vm_id}.")
+                        # print(f"Task type {task_type} allocated to VM {alt_vm} instead of overloaded VM {vm_id}.")
                         break
                 # 如果所有同类型虚拟机都超载，则该任务不分配
                 if not allocated:
@@ -284,11 +284,11 @@ class CloudEnv:
         # 3. 判断是否有实体机过载
         overload_flag = any(l > PM_CAPACITY for l in pm_loads)
         if overload_flag:
-            print("Overload detected! Entity machine load exceeds capacity.")
-            overload_nums += 1
+            # print("Overload detected! Entity machine load exceeds capacity.")
             for pm_id, load in enumerate(pm_loads):
                 if load > PM_CAPACITY:
-                    print(f"Entity machine {pm_id} overloaded with load {load}.")
+                    overload_nums += 1
+                    # print(f"Entity machine {pm_id} overloaded with load {load}.")
 
 
         return overload_flag, overload_nums
