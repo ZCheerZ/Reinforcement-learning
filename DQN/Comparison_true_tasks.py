@@ -9,6 +9,8 @@ from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYP
 # todo : 把evaluate_with_true_tasks换了 冗余代码太多  还有模型定义以及这里的获取信息代码也需要更换 over
 # todo : 把这个对比算法的画图逻辑顺好，还有就是强化学习过程的选择逻辑在信息更新之后，需要修改一下，把整个对比实验流程捋一下 没有预测的情况下
 # todo : 把task序列的转换函数写一下，不知道真实序列是否需要转，那就暂时不转吧 真实序列可能就是1，2，3，1，1
+# todo : 训练的时候就先调整任务队列  再进行选择  对比的时候可以把cpu改成核，而不是cpu的百分比  这样虚拟机方差就很小了，同时我的离散状态也很少 哦好像不会少
+#          明天先把负载换成1步长  然后调整顺序                           但是这样虚拟机确实方差就很小，应该能体现出DQN的优势，
 
 
 def load_agent_from_file(policy_net_path="DQN/model/policy_net(244).pth"):
@@ -30,11 +32,11 @@ def get_task_sequence(episodes=10, max_tasks=20):
     
     all_task_types = []
     total_nums = 0
-    with open("DQN/task_sequence.txt", "w") as f:
-        for _ in range(episodes):
+    # with open("DQN/task_sequence.txt", "w") as f:
+    for _ in range(episodes):
             task_types = [random.randint(0, model_definition.NUM_TASK_TYPES-1) for _ in range(random.randint(1, max_tasks))]
             total_nums += len(task_types)
-            f.write(" ".join(map(str, task_types)) + "\n")
+            # f.write(" ".join(map(str, task_types)) + "\n")
             all_task_types.append(task_types)
     # 将all_task_types 写到txt文件中
     return all_task_types, total_nums
@@ -56,7 +58,7 @@ def get_task_sequence_from_file(file_path):
             total_nums += len(task_types)
             T += 1
             all_task_types.append(task_types)
-    print("从文件中读取的任务序列：", all_task_types)
+    # print("从文件中读取的任务序列：", all_task_types)
     return all_task_types, total_nums, T
 
 def evaluate_performance(all_task_types,choose_function, T=100,agent= None):
@@ -256,10 +258,10 @@ def comparison_():
     比较dp+DQN、padding+轮询分配的负载均衡效果
     :return: None
     """
-    T = 10
+    T = 10000
     # 1. 生成所有任务序列（每一轮的任务类型序列）
-    # all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=4)
-    all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt")
+    all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=90)
+    # all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt") # 现在这个好！！！千万别删
     # print("生成的第一轮任务序列：", all_task_types)
     # 2. DQN评估
     agent = load_agent_from_file()
@@ -303,5 +305,5 @@ def comparison_():
 
 # model_definition.NUM_PM = 9  #根据这个来改  到时候model_definition.py里对应有个一改而改的操作函数  类似工具函数
 # model_definition.env_params_reset(num_pm=6, num_task_types=3,num_vms_per_type=[2,2,2])  # 重置环境参数
-# comparison_()
-all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt")
+comparison_()
+# all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt")

@@ -16,7 +16,7 @@ TARGET_UPDATE_FREQ = 100
 EPSILON = 0.2 # 探索率
 a = 0.4 
 b = 0.5
-overload = 10000
+overload = 50000
 
 # 环境参数
 NUM_TASK_TYPES = 3  # 应用类型数量
@@ -218,7 +218,57 @@ class CloudEnv:
         reward = -a * vm_var - b * entity_var - overload_penalty
         return reward, False
     
-    def step_batch(self, task_types, agent , choose_function):
+    def step_training(self, task_type ,agent): 
+        #  DQN学习过程中使用的step，将每个任务分配到指定虚拟机，并计算奖励
+        #  执行动作：分配任务到虚拟机，并处理任务队列
+        #  处理任务队列（减少剩余步长）
+        released_load = 0
+        for vm in range(len(VMS_PER_TYPE)):  # sum(NUM_VMS_PER_TYPE)
+            new_queue = deque()
+            while self.task_queues[vm]:
+                remain_steps, load = self.task_queues[vm].popleft()
+                remain_steps -= 1
+                if remain_steps > 0:
+                    new_queue.append((remain_steps, load))
+                else:  # 任务完成，释放负载
+                    self.vm_load[vm] -= load
+                    released_load += load
+            self.task_queues[vm] = new_queue
+
+        # 选择动作
+        state = self.get_state(task_type)
+        state = np.array(state, dtype=np.float32)
+        action = agent.choose_action_multi(state)
+        vm_id = self.prefix_NUM_VMS_PER_TYPE[int(task_type)] + action  # 虚拟机ID
+        
+        #添加新任务到队列
+        task_demand = TASK_CONFIG[task_type]["demand"]
+        task_duration = TASK_CONFIG[task_type]["duration"]
+        
+        # 检查虚拟机容量是否足够
+        if self.vm_load[vm_id] + task_demand > VM_CAPACITY[VMS_PER_TYPE[vm_id]]:
+            reward = -1 * overload  # 直接拒绝任务的惩罚
+            return action,reward, False
+        
+        # 更新虚拟机负载并检查实体机负载是否足够，不足够也直接拒绝任务并给出惩罚
+        self.vm_load[vm_id] += task_demand
+        # 实体机负载方差
+        pm_loads , pm_utilization, pm_var = self.get_pm_info()  # 获取实体机负载信息
+        if any(l > PM_CAPACITY for l in pm_loads):
+            self.vm_load[vm_id] -= task_demand
+            reward = -1 * overload  # 实体机过载的惩罚
+            return action, reward, False
+        self.task_queues[vm_id].append((task_duration, task_demand))
+        # 计算奖励
+        # 同类型虚拟机的负载方差
+        same_type_vms = [self.vm_load[i] for i in range(len(VMS_PER_TYPE)) 
+                       if VMS_PER_TYPE[i] == task_type]
+        vm_var = np.var(same_type_vms)
+        
+        reward = -a * vm_var - b * pm_var
+        return action, reward, False
+    
+    def step_batch(self, task_types, agent, choose_function):
         """
         是检验DQN效果过程中的真实任务到来step,学习过程中是一个个一个任务来，而这里是批量到来，实际上学习过程是更加精细的，批量到来可以看成一个一个来并选择
         批量执行任务分配，不计算奖励，只更新负载和判断过载。

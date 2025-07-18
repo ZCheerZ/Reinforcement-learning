@@ -10,8 +10,8 @@ from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYP
 EPSILON = 0.2
 EPSILON_DECAY = 0.995
 MIN_EPSILON = 0.01
-EPISODES = 1500
-MAX_STEPS = 1024*3
+EPISODES = 3000
+MAX_STEPS = 1024
 
 
 def train_test():
@@ -23,6 +23,10 @@ def train_test():
     # 记录每个回合的总奖励
     rewards_history = []
 
+    tracked_state = (0, 3, 7, 3, 7, 3, 3, 2, 3, 7, 1)
+    tracked_state = np.array(tracked_state, dtype=np.float32)
+
+
     # 训练循环
     for episode in range(EPISODES):
         env.reset()
@@ -32,14 +36,14 @@ def train_test():
 
         for step in range(MAX_STEPS):
             # 选择动作
-            action = agent.choose_action_multi(state)
-
+            # action = agent.choose_action_multi(state)
             # 执行动作
             task_type = state[0]  # 当前任务类型
-            # 原来是这里出错了！！！
-            # vm_id = int(task_type * NUM_VMS_PER_TYPE[int(task_type)] + action)
-            vm_id = env.prefix_NUM_VMS_PER_TYPE[int(task_type)] + action  # 虚拟机ID
-            reward, done = env.step(int(task_type), vm_id)
+            # 原来是这里出错了！！！ vm_id = int(task_type * NUM_VMS_PER_TYPE[int(task_type)] + action)
+            # vm_id = env.prefix_NUM_VMS_PER_TYPE[int(task_type)] + action  # 虚拟机ID
+            # reward, done = env.step(int(task_type), vm_id)
+            # 先出队列 在选择动作
+            action, reward, done = env.step_training(int(task_type), agent)
             next_state = env.get_state(random.randint(0, NUM_TASK_TYPES - 1))
             next_state = np.array(next_state, dtype=np.float32)
 
@@ -64,6 +68,8 @@ def train_test():
 
         # if episode % 500 == 0:
         print(f"Episode {episode}, Avg Reward: {episode_reward:.2f}")
+        print(f"测试动作值分布: {agent.policy_net(torch.FloatTensor(tracked_state).unsqueeze(0))}")
+
 
         rewards_history.append(episode_reward)
         
