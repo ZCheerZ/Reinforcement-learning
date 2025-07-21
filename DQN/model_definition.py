@@ -20,7 +20,7 @@ overload = 50000
 
 # 环境参数
 NUM_TASK_TYPES = 3  # 应用类型数量
-NUM_VMS_PER_TYPE = [2,4,4]  # 每种应用类型有多少台虚拟机 VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3] 
+NUM_VMS_PER_TYPE = [2,3,3]  # 每种应用类型有多少台虚拟机 VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3] 
 VMS_PER_TYPE = [] # 每台虚拟机到应用类型的映射
 for i in range(NUM_TASK_TYPES):
     for j in range(NUM_VMS_PER_TYPE[i]):
@@ -28,13 +28,13 @@ for i in range(NUM_TASK_TYPES):
 # print("VMS_PER_TYPE:", VMS_PER_TYPE)
 NUM_PM = 3  # 实体机数量
 TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为了使得离散值都能覆盖到 训练的时候可以把duration拉长以覆盖更多，实际用的时候用实际值
-    0: {"demand": 1, "duration": 5},  # 类型0: 需求10%，持续8步长
-    1: {"demand": 2, "duration": 5},  # 类型1: 需求10%，持续9步长
-    2: {"demand": 3, "duration": 5},  # 类型2: 需求10%，持续7步长
+    0: {"demand": 5, "duration": 1},  # 类型0: 需求10%，持续8步长
+    1: {"demand": 5, "duration": 2},  # 类型1: 需求10%，持续9步长
+    2: {"demand": 5, "duration": 3},  # 类型2: 需求10%，持续7步长
     # 3: {"demand": 10, "duration": 10},  # 类型2: 需求10%，持续7步长
 
 }
-VM_CAPACITY = [100,100,100]  # 虚拟机容量，执行不同应用类型任务的虚拟机资源容量
+VM_CAPACITY = [100,120,150]  # 虚拟机容量，执行不同应用类型任务的虚拟机资源容量
 PM_CAPACITY = 300  # 实体机容量（300%）
 
 def env_params_reset(num_pm=None, num_task_types=None, num_vms_per_type=None, task_config=None, vm_capacity=None, pm_capacity=None):
@@ -101,11 +101,11 @@ class CloudEnv:
     def _get_vm_level(self, load, vm_type):
         rate = load / VM_CAPACITY[vm_type] *100  # 获取对应虚拟机的容量比率
         # 将负载百分比转换为离散等级（1/2/3.../10）
-        level = int(rate // 2) + 1
+        level = int(rate // 5) + 1
         if level < 1:
             level = 1
-        elif level > 50:
-            level = 50
+        elif level > 20:
+            level = 20
         return level
         # if rate < 10:
         #     return 1
@@ -141,7 +141,7 @@ class CloudEnv:
         vm_level: 1~10
         """
         all_states = []
-        vm_level_range = list(range(1, 51))  # 1~11
+        vm_level_range = list(range(1, 21))  # 1~11
         for task_type in range(NUM_TASK_TYPES):
             # 每台虚拟机有10种level 10的n次方个组合  所以不能用q-learning
             for vm_levels in itertools.product(vm_level_range, repeat=len(VMS_PER_TYPE)): # sum(NUM_VMS_PER_TYPE)

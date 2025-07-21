@@ -13,7 +13,7 @@ from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYP
 #          明天先把负载换成1步长  然后调整顺序                           但是这样虚拟机确实方差就很小，应该能体现出DQN的优势，
 
 
-def load_agent_from_file(policy_net_path="DQN/model/policy_net(244).pth"):
+def load_agent_from_file(policy_net_path="DQN/model/policy_net(233).pth"):
     state_dim = 1 + sum(model_definition.NUM_VMS_PER_TYPE)  # 状态维度
     action_dim = max(model_definition.NUM_VMS_PER_TYPE)  # 动作维度
     agent = DQNAgent(state_dim, action_dim)
@@ -88,6 +88,8 @@ def evaluate_performance(all_task_types,choose_function, T=100,agent= None):
         for i in range(len(vm_utilization)):
             vm_utilizations[i].append(vm_utilization[i])
         total_overload_nums += overload_nums
+        if(pm_var>8000):
+            print(f"Episode {t} has overload PMs: {pm_loads}")
     print("违规数：",total_overload_nums)
     return vm_vars, pm_vars,vm_utilizations, pm_utilizations,total_overload_nums
 
@@ -179,7 +181,7 @@ def evaluate():
     #         vm_var_random, entity_var_random,vm__utilization_random,pm__utilization_random,\
     #         vm_var_rr, entity_var_rr,vm__utilization_rr,pm__utilization_rr = evaluate_with_true_tasks(agent, episodes=1000)\
     T = 500
-    all_task_types = get_task_sequence(episodes=T, max_tasks=1)
+    all_task_types = get_task_sequence(episodes=T, max_tasks=50)
     vm_var_q, entity_var_q,vm__utilization_q,pm__utilization_q = evaluate_performance(all_task_types, choose_function="DQN", T=T, agent=agent)
     vm_var_random, entity_var_random,vm__utilization_random,pm__utilization_random = evaluate_performance(all_task_types, choose_function="Random", T=T, agent=None)
     vm_var_rr, entity_var_rr,vm__utilization_rr,pm__utilization_rr = evaluate_performance(all_task_types, choose_function="RR", T=T, agent=None)
@@ -258,15 +260,15 @@ def comparison_():
     比较dp+DQN、padding+轮询分配的负载均衡效果
     :return: None
     """
-    T = 10000
+    T = 1000
     # 1. 生成所有任务序列（每一轮的任务类型序列）
-    all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=90)
+    all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=110)
     # all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt") # 现在这个好！！！千万别删
     # print("生成的第一轮任务序列：", all_task_types)
     # 2. DQN评估
     agent = load_agent_from_file()
     vm_var_q, entity_var_q,vm__utilization_q,pm__utilization_q,overload_nums_q = evaluate_performance(all_task_types, choose_function="DQN", T=T, agent=agent)
-    # model_definition.env_params_reset(num_pm=5,num_vms_per_type=[5,5,5])  # 重置环境参数
+    model_definition.env_params_reset(num_pm=5,num_vms_per_type=[5,4,4])  # 重置环境参数
     vm_var_rr, entity_var_rr,vm__utilization_rr,pm__utilization_rr,overload_nums_rr = evaluate_performance(all_task_types, choose_function="RR", T=T, agent=None)
     # vm_var_random, entity_var_random,vm__utilization_random,pm__utilization_random,overload_nums_random = evaluate_performance(all_task_types, choose_function="Random", T=T, agent=None)
     # 计算每种类型虚拟机方差的均值
@@ -291,15 +293,39 @@ def comparison_():
     # for i in range(sum(model_definition.NUM_VMS_PER_TYPE)):
     #     print(f"VM {i} - DQN: {np.mean(vm__utilization_q[i]):.4f}, RR: {np.mean(vm__utilization_rr[i]):.4f}")
     # print("--------------------------------------")
-    # print("各算法每种应用类型实体机平均利用率：")
-    # for i in range(len(pm__utilization_q)): 
-    #     print(f"PM {i} - DQN: {np.mean(pm__utilization_q[i]):.4f}")
-    # for i in range(len(pm__utilization_rr)): 
-    #     print(f"PM {i} - RR: {np.mean(pm__utilization_rr[i]):.4f}")
+    print("各算法每种应用类型实体机平均利用率：")
+    for i in range(len(pm__utilization_q)): 
+        print(f"PM {i} - DQN: {np.mean(pm__utilization_q[i]):.4f}")
+    for i in range(len(pm__utilization_rr)): 
+        print(f"PM {i} - RR: {np.mean(pm__utilization_rr[i]):.4f}")
     print("--------------------------------------")
     print("各算法违规率：")
     print(f"DQN:       {overload_nums_q/total_nums:.4f}")
     print(f"RR:        {overload_nums_rr/total_nums:.4f}")
+
+    # 绘图  怎么画出好看的图像 画一个实体机资源利用率对比的图像
+    plt.figure(figsize=(15,8))
+    # 虚拟机负载方差（每种类型单独画线）
+    # for i in range(model_definition.NUM_TASK_TYPES):
+    #     plt.subplot(3,2,i+1)
+    #     plt.plot(vm_var_q[i], label=f"DQN Type {i}")
+    #     plt.plot(vm_var_rr[i], '--', label=f"RR Type {i}")
+    #     plt.title("VM load variance (per type)")
+    #     plt.xlabel("Episode")
+    #     plt.ylabel("Variance")
+    #     plt.legend()
+    #     plt.grid()
+    # 实体机负载方差
+    # plt.subplot(3,2,5)
+    plt.plot(entity_var_q, label="DQN")
+    plt.plot(entity_var_rr, label="RR")
+    plt.title("PM load variance")
+    plt.xlabel("Episode")
+    plt.ylabel("Variance")
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
+    plt.show()
 
 
 

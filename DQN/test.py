@@ -1,18 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt  # 用于绘图
 import torch
+import random
 from model_definition import CloudEnv, DQNAgent
+from model_definition import NUM_TASK_TYPES, NUM_VMS_PER_TYPE, VMS_PER_TYPE, NUM_PM
 
 
 
-# 环境参数
-NUM_TASK_TYPES = 3  # 应用类型数量
-NUM_VMS_PER_TYPE = [2,4,3]  # 每种应用类型有3台虚拟机
-NUM_PM = 3  # 实体机数量
-
-
-
-def load_agent_from_file(policy_net_path="DQN/policy_net(243).pth"):
+def load_agent_from_file(policy_net_path="DQN/model/policy_net(233).pth"):
     state_dim = 1 + sum(NUM_VMS_PER_TYPE)  # 状态维度
     action_dim = max(NUM_VMS_PER_TYPE)  # 动作维度
     agent = DQNAgent(state_dim, action_dim)
@@ -21,14 +16,29 @@ def load_agent_from_file(policy_net_path="DQN/policy_net(243).pth"):
     print("模型已从 DQN/policy_net.pth 加载")
     return agent
 
+def generate_random_state():
+    """
+    基于NUM_VMS_PER_TYPE随机生成一个状态
+    返回格式: (task_type, vm_level_0, vm_level_1, ..., vm_level_n)
+    """
+    # 随机生成任务类型
+    task_type = random.randint(0, NUM_TASK_TYPES - 1)
+    # 随机生成每台虚拟机的等级
+    state = [task_type]
+    for i in range(len(VMS_PER_TYPE)):
+        # 随机生成虚拟机负载等级（1-50级，对应0-100%负载）
+        vm_level = random.randint(1, 20)
+        state.append(vm_level)
+    
+    return tuple(state)
+
 def evaluate_load_balance():
 
     agent = load_agent_from_file()
-
     test_states = [
-        (0, 1, 3, 1, 1, 1, 1, 2, 1, 1),
-        (0, 2, 1, 2, 1, 2, 2, 2, 2, 1),
-        (1, 1, 2, 2, 1, 1, 1, 2, 1, 1)
+        generate_random_state(),
+        generate_random_state(),
+        generate_random_state(),
     ]
     env = CloudEnv()
     for idx, test_state in enumerate(test_states):

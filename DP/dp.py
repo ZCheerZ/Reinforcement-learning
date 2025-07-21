@@ -72,7 +72,8 @@ def main():
         print("\n" + "-" * 50)
 
     do_task = [0] * num_types # 记录每种类型的任务执行数
-    t = 2  # 假设一开始不满足3个需求
+    e = 0.005 # 允许的违规率
+    t = int(np.ceil(e*sum((len(arr) for arr in data))))  # 假设一开始不满足3个需求
     now_sla = t
     for i in range(num_types-1,-1,-1):
         print(f"应用类型{i+1}允许违规数: {now_sla-path[i][t]}, 执行任务数为{a[i][now_sla-path[i][t]]}", end="\n")
@@ -80,8 +81,8 @@ def main():
         now_sla = path[i][t]
         t = path[i][t]
     
-    task_needs = [10, 20, 30]  # 假设每种类型的任务需求值 cpu
-    vm_resources = [100] * num_types  # 初始化每种类型的虚拟机资源 cpu
+    task_needs = [1, 2, 3]  # 假设每种类型的任务需求值 cpu
+    vm_resources = [100,120,130]  # 初始化每种类型的虚拟机资源 cpu
     vm_max_usage = [0.9] * num_types  # 假设每种类型虚拟机的最大使用率 提前先预留一点防止过载
     vm_nums = [0] * num_types  # 初始化每种类型的虚拟机数量
     total_vm_resource = 0 # 总虚拟机资源
@@ -93,7 +94,7 @@ def main():
         total_vm_resource += vm_nums[i] * vm_resources[i]
     # 写文件  虚拟机数量  以及实体机数量  到时候开完组会 确定是否要超频处理得到实体机数量！ 要！自己定义数值即可
     # 首先是确定实体机数量 其次是确定一个实体机放几个虚拟机，无需确定后者了  直接平铺分配 超额了就是过载即可
-    average_utilization_rate = 0.85
+    average_utilization_rate = 0.90
     pm_resource = 300
     pm_nums = int(np.ceil(total_vm_resource * average_utilization_rate / pm_resource))
     print(f"总虚拟机资源: {total_vm_resource}, 实体机数量: {pm_nums}, 每台实体机资源: {pm_resource}")
