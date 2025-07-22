@@ -9,7 +9,7 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK']='TRUE'
 # 超参数
 LEARNING_RATE = 0.001
-DISCOUNT_FACTOR = 0.8
+DISCOUNT_FACTOR = 0.6
 BATCH_SIZE = 64
 MEMORY_SIZE = 50000
 TARGET_UPDATE_FREQ = 100
@@ -20,7 +20,7 @@ overload = 50000
 
 # 环境参数
 NUM_TASK_TYPES = 3  # 应用类型数量
-NUM_VMS_PER_TYPE = [2,3,3]  # 每种应用类型有多少台虚拟机 VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3] 
+NUM_VMS_PER_TYPE = [2,4,4]  # 每种应用类型有多少台虚拟机 VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3] 
 VMS_PER_TYPE = [] # 每台虚拟机到应用类型的映射
 for i in range(NUM_TASK_TYPES):
     for j in range(NUM_VMS_PER_TYPE[i]):
@@ -28,9 +28,9 @@ for i in range(NUM_TASK_TYPES):
 # print("VMS_PER_TYPE:", VMS_PER_TYPE)
 NUM_PM = 3  # 实体机数量
 TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为了使得离散值都能覆盖到 训练的时候可以把duration拉长以覆盖更多，实际用的时候用实际值
-    0: {"demand": 5, "duration": 1},  # 类型0: 需求10%，持续8步长
-    1: {"demand": 5, "duration": 2},  # 类型1: 需求10%，持续9步长
-    2: {"demand": 5, "duration": 3},  # 类型2: 需求10%，持续7步长
+    0: {"demand": 1, "duration": 2},  # 类型0: 需求10%，持续8步长
+    1: {"demand": 2, "duration": 2},  # 类型1: 需求10%，持续9步长
+    2: {"demand": 3, "duration": 3},  # 类型2: 需求10%，持续7步长
     # 3: {"demand": 10, "duration": 10},  # 类型2: 需求10%，持续7步长
 
 }
@@ -101,11 +101,11 @@ class CloudEnv:
     def _get_vm_level(self, load, vm_type):
         rate = load / VM_CAPACITY[vm_type] *100  # 获取对应虚拟机的容量比率
         # 将负载百分比转换为离散等级（1/2/3.../10）
-        level = int(rate // 5) + 1
+        level = int(rate) + 1
         if level < 1:
             level = 1
-        elif level > 20:
-            level = 20
+        elif level > 100:
+            level = 100
         return level
         # if rate < 10:
         #     return 1
@@ -141,7 +141,7 @@ class CloudEnv:
         vm_level: 1~10
         """
         all_states = []
-        vm_level_range = list(range(1, 21))  # 1~11
+        vm_level_range = list(range(1, 101))  # 1~11
         for task_type in range(NUM_TASK_TYPES):
             # 每台虚拟机有10种level 10的n次方个组合  所以不能用q-learning
             for vm_levels in itertools.product(vm_level_range, repeat=len(VMS_PER_TYPE)): # sum(NUM_VMS_PER_TYPE)
@@ -159,8 +159,8 @@ class CloudEnv:
             # 反推负载百分比区间的均值
             vm_type = VMS_PER_TYPE[i]
             level = state[i + 1]
-            # 反推百分比区间的中值
-            self.vm_load[i] = (level*10-5) / 100 * VM_CAPACITY[vm_type]
+            # 反推百分比区间的中值  percent = (level * 区间宽度 - 区间宽度/2)
+            self.vm_load[i] = (level * 1 - 0.5) / 100 * VM_CAPACITY[vm_type]
         # 清空任务队列（注意：此处未恢复任务队列，仅用于Q表学习）
         for q in self.task_queues:
             q.clear()
@@ -486,8 +486,23 @@ class DQNAgent:
 
         # 计算目标 Q 值
         with torch.no_grad():
-            max_next_q_values = self.target_net(next_states).max(1, keepdim=True)[0]
+            # max_next_q_values = self.target_net(next_states).max(1, keepdim=True)[0]
+            # target_q_values = rewards + (1 - dones) * DISCOUNT_FACTOR * max_next_q_values
+            # 获取所有 next_states 的 Q 值
+            all_next_q = self.target_net(next_states).cpu().numpy()  # shape: [batch_size, action_dim]
+            max_next_q_values = []
+            for idx, next_state in enumerate(next_states.cpu().numpy()):
+                # 获取当前 next_state 可选动作编号列表
+                task_type = int(next_state[0])
+                start = self.prefix_NUM_VMS_PER_TYPE[task_type]
+                end = self.prefix_NUM_VMS_PER_TYPE[task_type + 1]
+                available_actions = [i - start for i in range(start, end)]
+                # 只在可行动作中选最大 Q 值
+                q_vals = all_next_q[idx][available_actions]
+                max_next_q_values.append(np.max(q_vals))
+            max_next_q_values = torch.FloatTensor(max_next_q_values).unsqueeze(1)
             target_q_values = rewards + (1 - dones) * DISCOUNT_FACTOR * max_next_q_values
+            
 
         # 更新主网络
         loss = self.loss_fn(q_values, target_q_values)

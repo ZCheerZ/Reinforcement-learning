@@ -13,7 +13,7 @@ from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYP
 #          明天先把负载换成1步长  然后调整顺序                           但是这样虚拟机确实方差就很小，应该能体现出DQN的优势，
 
 
-def load_agent_from_file(policy_net_path="DQN/model/policy_net(233).pth"):
+def load_agent_from_file(policy_net_path="DQN/model/policy_net(244).pth"):
     state_dim = 1 + sum(model_definition.NUM_VMS_PER_TYPE)  # 状态维度
     action_dim = max(model_definition.NUM_VMS_PER_TYPE)  # 动作维度
     agent = DQNAgent(state_dim, action_dim)
@@ -262,8 +262,8 @@ def comparison_():
     """
     T = 1000
     # 1. 生成所有任务序列（每一轮的任务类型序列）
-    all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=110)
-    # all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt") # 现在这个好！！！千万别删
+    all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=170)
+    # all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt")
     # print("生成的第一轮任务序列：", all_task_types)
     # 2. DQN评估
     agent = load_agent_from_file()

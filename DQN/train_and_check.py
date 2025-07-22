@@ -10,8 +10,10 @@ from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYP
 EPSILON = 0.2
 EPSILON_DECAY = 0.995
 MIN_EPSILON = 0.001
-EPISODES = 3000
-MAX_STEPS = 1024
+EPISODES = 5000
+MAX_STEPS = 1024 * 2
+
+#环境初始化的时候 加东西
 
 
 def train_test():
@@ -22,7 +24,7 @@ def train_test():
     agent = DQNAgent(state_dim, action_dim)
     # 记录每个回合的总奖励
     rewards_history = []
-    tracked_state = (0, 7, 8, 6, 3, 15, 8, 18, 9)
+    tracked_state = (0, 7, 8, 6, 3, 15, 8, 18, 9, 6, 7)
     tracked_state = np.array(tracked_state, dtype=np.float32)
 
 
@@ -49,10 +51,10 @@ def train_test():
             # 存储经验
             agent.store_experience(state, action, reward, next_state, done)
 
-            if(step == MAX_STEPS - 1):
-                pm_loads,pm_utilization, pm_var = env.get_pm_info()  # 打印实体机信息
+            # if(step == MAX_STEPS - 1):
+            #     pm_loads,pm_utilization, pm_var = env.get_pm_info()  # 打印实体机信息
                 # print(f"Episode {episode}, Step {step}, Action: {action}, Reward: {reward}, Done: {done}")
-                print(f"当前状态: {state},当前实体机负载: {pm_loads}")
+                # print(f"当前状态: {state},当前实体机负载: {pm_loads}")
             # 更新状态
             state = next_state
             episode_reward += reward
@@ -72,7 +74,7 @@ def train_test():
 
         # if episode % 500 == 0:
         print(f"Episode {episode}, Avg Reward: {episode_reward:.2f}")
-        print(f"测试动作值分布: {agent.policy_net(torch.FloatTensor(tracked_state).unsqueeze(0))}")
+        print(f"追踪动作值分布: {agent.policy_net(torch.FloatTensor(tracked_state).unsqueeze(0))}")
 
 
         rewards_history.append(episode_reward)
@@ -94,7 +96,7 @@ def train_test():
     plt.show()
 
     # 保存模型
-    file_path = "DQN/model/policy_net(233).pth"
+    file_path = "DQN/model/policy_net(244).pth"
     torch.save(agent.policy_net.state_dict(), file_path)
     print("模型已保存到", file_path)
 
