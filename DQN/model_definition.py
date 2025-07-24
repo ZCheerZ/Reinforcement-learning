@@ -159,8 +159,8 @@ class CloudEnv:
             # 反推负载百分比区间的均值
             vm_type = VMS_PER_TYPE[i]
             level = state[i + 1]
-            # 反推百分比区间的中值  percent = (level * 区间宽度 - 区间宽度/2)
-            self.vm_load[i] = (level * 1 - 0.5) / 100 * VM_CAPACITY[vm_type]
+            # 反推百分比区间的中值  percent = (level * 区间宽度 - 区间宽度/2) 除了1之外
+            self.vm_load[i] = (level * 1) / 100 * VM_CAPACITY[vm_type]
         # 清空任务队列（注意：此处未恢复任务队列，仅用于Q表学习）
         for q in self.task_queues:
             q.clear()

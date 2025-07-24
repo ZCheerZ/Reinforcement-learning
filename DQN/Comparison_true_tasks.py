@@ -262,7 +262,7 @@ def comparison_():
     """
     T = 1000
     # 1. 生成所有任务序列（每一轮的任务类型序列）
-    all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=170)
+    all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=250)
     # all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt")
     # print("生成的第一轮任务序列：", all_task_types)
     # 2. DQN评估
@@ -317,8 +317,8 @@ def comparison_():
     #     plt.grid()
     # 实体机负载方差
     # plt.subplot(3,2,5)
-    plt.plot(entity_var_q, label="DQN")
-    plt.plot(entity_var_rr, label="RR")
+    plt.plot(entity_var_q, label="DP+DQN")
+    plt.plot(entity_var_rr, label="Padding+RR")
     plt.title("PM load variance")
     plt.xlabel("Episode")
     plt.ylabel("Variance")

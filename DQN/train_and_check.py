@@ -15,6 +15,22 @@ MAX_STEPS = 1024 * 2
 
 #环境初始化的时候 加东西
 
+def generate_random_state(low,up):
+    """
+    基于NUM_VMS_PER_TYPE随机生成一个状态
+    返回格式: (task_type, vm_level_0, vm_level_1, ..., vm_level_n)
+    """
+    # 随机生成任务类型
+    task_type = random.randint(0, NUM_TASK_TYPES - 1)
+    # 随机生成每台虚拟机的等级
+    state = [task_type]
+    for i in range(len(VMS_PER_TYPE)):
+        # 随机生成虚拟机负载等级（1-100级，对应0-100%负载）
+        vm_level = random.randint(low, up)
+        state.append(vm_level)
+    
+    return tuple(state)
+
 
 def train_test():
     # 初始化环境与智能体
@@ -31,6 +47,19 @@ def train_test():
     # 训练循环
     for episode in range(EPISODES):
         env.reset()
+        if(episode <= 1500):
+            if episode % 2 == 0:
+                env.set_state(generate_random_state(1,21))  # 设置初始状态
+        elif(episode <= 3000):
+            if episode % 2 == 0:
+                env.set_state(generate_random_state(11,31)) # 11 31会不会好点
+            else:
+                env.set_state(generate_random_state(1,21))
+        else:
+            if episode % 2 == 0:
+                env.set_state(generate_random_state(21,51))
+            else:
+                env.set_state(generate_random_state(11,31))
         state = env.get_state(random.randint(0, NUM_TASK_TYPES - 1))
         state = np.array(state, dtype=np.float32)
         episode_reward = 0
