@@ -4,7 +4,7 @@ import torch
 from collections import defaultdict
 import matplotlib.pyplot as plt  # 用于绘图
 import model_definition
-from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYPE, NUM_PM 
+from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYPE, NUM_PM
 # todo : 这里的NUM_TASK_TYPES, NUM_VMS_PER_TYPE, NUM_PM 都是从model_definition.py里导入的 应该统一变为model_definition.xxx over
 # todo : 把evaluate_with_true_tasks换了 冗余代码太多  还有模型定义以及这里的获取信息代码也需要更换 over
 # todo : 把这个对比算法的画图逻辑顺好，还有就是强化学习过程的选择逻辑在信息更新之后，需要修改一下，把整个对比实验流程捋一下 没有预测的情况下
@@ -32,11 +32,11 @@ def get_task_sequence(episodes=10, max_tasks=20):
     
     all_task_types = []
     total_nums = 0
-    # with open("DQN/task_sequence.txt", "w") as f:
-    for _ in range(episodes):
+    with open("DQN/task_sequence.txt", "w") as f:
+        for _ in range(episodes):
             task_types = [random.randint(0, model_definition.NUM_TASK_TYPES-1) for _ in range(random.randint(1, max_tasks))]
             total_nums += len(task_types)
-            # f.write(" ".join(map(str, task_types)) + "\n")
+            f.write(" ".join(map(str, task_types)) + "\n")
             all_task_types.append(task_types)
     # 将all_task_types 写到txt文件中
     return all_task_types, total_nums
@@ -262,11 +262,15 @@ def comparison_():
     """
     T = 1000
     # 1. 生成所有任务序列（每一轮的任务类型序列）
-    all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=100)
+    all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=60)
     # all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt")
     # print("生成的第一轮任务序列：", all_task_types)
     # 2. DQN评估
-    agent = load_agent_from_file()
+    num_vms_str = ''.join(str(x) for x in NUM_VMS_PER_TYPE)
+    print("NUM_VMS_PER_TYPE字符串形式:", num_vms_str)
+    # 保存模型
+    file_path = "DQN/model/policy_net(" + num_vms_str + ").pth"
+    agent = load_agent_from_file(file_path)
     vm_var_q, entity_var_q,vm__utilization_q,pm__utilization_q,overload_nums_q = evaluate_performance(all_task_types, choose_function="DQN", T=T, agent=agent)
     # model_definition.env_params_reset(num_pm=5,num_vms_per_type=[5,4,4])  # 重置环境参数
     vm_var_rr, entity_var_rr,vm__utilization_rr,pm__utilization_rr,overload_nums_rr = evaluate_performance(all_task_types, choose_function="RR", T=T, agent=None)
@@ -333,3 +337,75 @@ def comparison_():
 # model_definition.env_params_reset(num_pm=6, num_task_types=3,num_vms_per_type=[2,2,2])  # 重置环境参数
 comparison_()
 # all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt")
+
+def get_task_sequence_by_type(episodes=10, means_tasks=20, dist_type='uniform'):
+    """
+    生成任务序列，支持泊松分布、均匀分布、正态分布
+    :param episodes: 周期数（时隙数）
+    :param max_tasks: 均匀分布时每个时隙任务总数
+    :param dist_type: 'uniform'/'poisson'/'normal'
+    :param lam: 泊松分布参数
+    :param mu: 正态分布均值
+    :param sigma: 正态分布标准差
+    :return: all_task_types, total_nums
+    """
+    sigma = 0.15 * means_tasks  # 正态分布的标准差
+    np.random.seed(42)  # 设置随机种子确保结果可复现
+    all_task_types = []
+    match dist_type:
+        case 'uniform':
+            tasks_nums = np.random.uniform(low=0, high=means_tasks, size=episodes)
+        case 'poisson':
+            tasks_nums = np.random.poisson(lam=means_tasks, size=episodes)
+        case 'normal':
+            tasks_nums = generate_normal_tasks(mean_tasks, sigma, episodes)
+    total_nums = sum(tasks_nums)
+
+    for task_num in tasks_nums:
+        # 均匀分配任务类型
+        if task_num == 0:
+            task_types = []
+        else:
+            base_num = task_num // NUM_TASK_TYPES
+            remainder = task_num % NUM_TASK_TYPES
+            task_counts = [base_num] * NUM_TASK_TYPES
+            for i in range(remainder):
+                task_counts[i] += 1
+            task_types = []
+            for t, count in enumerate(task_counts):
+                task_types += [t] * count
+            random.shuffle(task_types)  # 可选，打乱时隙内任务顺序
+        all_task_types.append(task_types)
+    return all_task_types, total_nums
+
+# 示例用法
+# 均匀分布
+# print(np.random.poisson(5,100))
+# print(np.random.normal(10, 2))
+# np.random.seed(42)  # 设置随机种子确保结果可复现
+# mean_tasks = 8     # 平均任务数量（与泊松分布示例一致）
+# std_dev = 6        # 标准差（控制任务数量的波动程度）
+# time_points = 10   # 时间点数量
+#
+# # 生成符合正态分布的任务数量（处理负值问题）
+# def generate_normal_tasks(mean, std, size):
+#     tasks = np.random.normal(loc=mean, scale=std, size=size)
+#     # 将负数转换为0（任务数量不能为负）
+#     tasks[tasks < 0] = 0
+#     # 四舍五入到最接近的整数
+#     tasks = np.round(tasks).astype(int)
+#     return tasks
+#
+# # 生成任务数量序列
+# tasks = generate_normal_tasks(mean_tasks, std_dev, time_points)
+# print(tasks)
+#
+# # 设置参数
+# np.random.seed(42)  # 设置随机种子确保结果可复现
+# lambda_ = 50  # 泊松分布的λ参数（平均任务数量）
+# time_points = 10  # 时间点数量
+#
+# # 生成符合泊松分布的任务数量
+# tasks = np.random.poisson(lam=lambda_, size=time_points)
+# print(tasks)
+
