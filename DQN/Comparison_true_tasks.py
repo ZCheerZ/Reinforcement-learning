@@ -13,7 +13,7 @@ from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYP
 #          明天先把负载换成1步长  然后调整顺序                           但是这样虚拟机确实方差就很小，应该能体现出DQN的优势，
 
 
-def load_agent_from_file(policy_net_path="DQN/model/policy_net(244).pth"):
+def load_agent_from_file(policy_net_path="DQN/model/policy_net(2234).pth"):
     state_dim = 1 + sum(model_definition.NUM_VMS_PER_TYPE)  # 状态维度
     action_dim = max(model_definition.NUM_VMS_PER_TYPE)  # 动作维度
     agent = DQNAgent(state_dim, action_dim)
@@ -95,7 +95,7 @@ def evaluate_performance(all_task_types,choose_function, T=100,agent= None):
 
 
 
-# def evaluate_with_true_tasks(agent, episodes=100):
+def evaluate_with_true_tasks(agent, episodes=100):
     """
     用同一批任务序列分别评估Q-learning、随机分配和轮询分配的负载均衡效果
     :param agent: 已训练好的 QLearningAgent
@@ -262,13 +262,13 @@ def comparison_():
     """
     T = 1000
     # 1. 生成所有任务序列（每一轮的任务类型序列）
-    all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=250)
+    all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=100)
     # all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt")
     # print("生成的第一轮任务序列：", all_task_types)
     # 2. DQN评估
     agent = load_agent_from_file()
     vm_var_q, entity_var_q,vm__utilization_q,pm__utilization_q,overload_nums_q = evaluate_performance(all_task_types, choose_function="DQN", T=T, agent=agent)
-    model_definition.env_params_reset(num_pm=5,num_vms_per_type=[5,4,4])  # 重置环境参数
+    # model_definition.env_params_reset(num_pm=5,num_vms_per_type=[5,4,4])  # 重置环境参数
     vm_var_rr, entity_var_rr,vm__utilization_rr,pm__utilization_rr,overload_nums_rr = evaluate_performance(all_task_types, choose_function="RR", T=T, agent=None)
     # vm_var_random, entity_var_random,vm__utilization_random,pm__utilization_random,overload_nums_random = evaluate_performance(all_task_types, choose_function="Random", T=T, agent=None)
     # 计算每种类型虚拟机方差的均值
