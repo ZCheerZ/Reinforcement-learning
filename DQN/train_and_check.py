@@ -11,7 +11,7 @@ from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYP
 EPSILON = 0.2
 EPSILON_DECAY = 0.995
 MIN_EPSILON = 0.1 # 0.001
-EPISODES = 12000
+EPISODES = 5000
 MAX_STEPS = 1024 * 2
 
 #环境初始化的时候 加东西
@@ -30,26 +30,26 @@ def train_init_state(env,episode):
         if(episode <= 3000):
             if episode % 2 == 0:
                 env.set_state(env.generate_random_state(1,21))  # 设置初始状态
-        elif(episode <= 6000):
+        elif(episode <= 5000):
             if episode % 2 == 0:
-                env.set_state(env.generate_random_state(11,31)) # 11 31会不会好点
+                env.set_state(env.generate_random_state(21,41)) # 11 31会不会好点
             else:
                 env.set_state(env.generate_random_state(1,21))
-        elif(episode <= 8000):
-            if episode % 2 == 0:
-                env.set_state(env.generate_random_state(21,41))
-            else:
-                env.set_state(env.generate_random_state(11,31))
-        elif(episode <= 10000):
-            if episode % 2 == 0:
-                env.set_state(env.generate_random_state(31,51))
-            else:
-                env.set_state(env.generate_random_state(21,41))
-        elif (episode <= 12000):
-            if episode % 2 == 0:
-                env.set_state(env.generate_random_state(41, 61))
-            else:
-                env.set_state(env.generate_random_state(31, 51))
+        # elif(episode <= 5000):
+        #     if episode % 2 == 0:
+        #         env.set_state(env.generate_random_state(41,61))
+        #     else:
+        #         env.set_state(env.generate_random_state(21,41))
+        # elif(episode <= 10000):
+        #     if episode % 2 == 0:
+        #         env.set_state(env.generate_random_state(31,51))
+        #     else:
+        #         env.set_state(env.generate_random_state(21,41))
+        # elif (episode <= 12000):
+        #     if episode % 2 == 0:
+        #         env.set_state(env.generate_random_state(41, 61))
+        #     else:
+        #         env.set_state(env.generate_random_state(31, 51))
 
         # if episode % 6 == 5:
         #     env.set_state(generate_state(50))
@@ -153,5 +153,81 @@ def train_test():
     print("模型已保存到", file_path)
 
 
-train_test()
+def get_task_sequence(max_tasks=20):
+    task_types = [random.randint(0, NUM_TASK_TYPES - 1) for _ in range(random.randint(1, max_tasks))]
+    return task_types
+
+def train_batch_task():
+    env = CloudEnv()
+    state_dim = 1 + sum(NUM_VMS_PER_TYPE)  # 状态维度
+    action_dim = max(NUM_VMS_PER_TYPE)  # 动作维度
+    agent = DQNAgent(state_dim, action_dim)
+    # 记录每个回合的总奖励
+    rewards_history = []
+    tracked_state = (3, 9, 14, 4, 16, 16, 8, 15, 3, 21, 8, 20, 5, 20, 8, 14, 4, 8, 7, 17, 10)  # (0, 7, 8, 6, 3, 15, 8, 18, 9, 6, 7, 7)
+    tracked_state = np.array(tracked_state, dtype=np.float32)
+
+    # 训练循环
+    for episode in range(EPISODES):
+        env.reset()
+        # train_init_state(env, episode)
+        task_types = get_task_sequence(70)
+        episode_reward = 0
+        for step in range(MAX_STEPS):
+            states, actions, rewards, next_states, dones = env.step_training_batch(task_types,agent)
+            # 存储经验
+            for i in range(len(task_types)):
+                agent.store_experience(states[i], actions[i], rewards[i], next_states[i], dones[i])
+
+            if (step == MAX_STEPS - 1):
+                pm_loads, pm_utilization, pm_var = env.get_pm_info()  # 打印实体机信息
+                # print(f"Episode {episode}, Step {step}, Action: {action}, Reward: {reward}, Done: {done}")
+                print(f"当前状态: {next_states[len(task_types)-1]},当前实体机负载: {pm_loads}")
+            # 更新状态
+            episode_reward += sum(rewards)/len(rewards)
+            task_types = get_task_sequence(70)
+
+            # 训练网络
+            agent.train()
+
+        # 减少 epsilon
+        # 因为随着训练的进行，智能体会越来越依赖于学习到的策略，而不是随机选择动作 但我的训练状态策略会不会被有所影响 就没有机会去选择其他的动作了
+        agent.epsilon = max(MIN_EPSILON, agent.epsilon * EPSILON_DECAY)
+
+        # 更新目标网络
+        if episode % TARGET_UPDATE_FREQ == 0:
+            agent.update_target_network()
+
+        # if episode % 500 == 0:
+        print(f"Episode {episode}, Avg Reward: {episode_reward:.2f}")
+        print(f"追踪动作值分布: {agent.policy_net(torch.FloatTensor(tracked_state).unsqueeze(0))}")
+
+        rewards_history.append(episode_reward)
+
+    # 测试示例
+    test_task_type = 0
+    test_state = env.get_state(test_task_type)
+    # test_state = (0, 2, 1, 2, 1, 2, 2, 2, 2, 1, 2)
+    test_state = np.array(test_state, dtype=np.float32)
+    print(f"测试状态: {test_state}")
+    print(f"测试动作值分布: {agent.policy_net(torch.FloatTensor(test_state).unsqueeze(0))}")
+
+    # 绘制奖励曲线
+    plt.plot(rewards_history)
+    plt.xlabel('Episode')
+    plt.ylabel('Total Reward')
+    plt.title('Training Progress')
+    plt.show()
+
+    # 将NUM_VMS_PER_TYPE数组的数字变成字符串
+    num_vms_str = ''.join(str(x) for x in NUM_VMS_PER_TYPE)
+    print("NUM_VMS_PER_TYPE字符串形式:", num_vms_str)
+    # 保存模型
+    file_path = "DQN/model/policy_net(" + num_vms_str + ").pth"
+    torch.save(agent.policy_net.state_dict(), file_path)
+    print("模型已保存到", file_path)
+
+
+# train_test()
+train_batch_task()
 # print(generate_random_state(1,21))  # 测试生成随机状态函数

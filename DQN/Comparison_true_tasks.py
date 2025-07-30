@@ -262,14 +262,14 @@ def comparison_():
     """
     T = 1000
     # 1. 生成所有任务序列（每一轮的任务类型序列）
-    all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=60)
+    all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=70)
     # all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt")
     # print("生成的第一轮任务序列：", all_task_types)
     # 2. DQN评估
     num_vms_str = ''.join(str(x) for x in NUM_VMS_PER_TYPE)
     print("NUM_VMS_PER_TYPE字符串形式:", num_vms_str)
     # 保存模型
-    file_path = "DQN/model/policy_net(" + num_vms_str + ").pth"
+    file_path = "DQN/model/policy_net(" + num_vms_str + ")best.pth"
     agent = load_agent_from_file(file_path)
     vm_var_q, entity_var_q,vm__utilization_q,pm__utilization_q,overload_nums_q = evaluate_performance(all_task_types, choose_function="DQN", T=T, agent=agent)
     # model_definition.env_params_reset(num_pm=5,num_vms_per_type=[5,4,4])  # 重置环境参数
@@ -338,6 +338,15 @@ def comparison_():
 comparison_()
 # all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt")
 
+# 生成符合正态分布的任务数量（处理负值问题）
+def generate_normal_tasks(mean, std, size):
+    tasks = np.random.normal(loc=mean, scale=std, size=size)
+    # 将负数转换为0（任务数量不能为负）
+    tasks[tasks < 0] = 0
+    # 四舍五入到最接近的整数
+    tasks = np.round(tasks).astype(int)
+    return tasks
+
 def get_task_sequence_by_type(episodes=10, means_tasks=20, dist_type='uniform'):
     """
     生成任务序列，支持泊松分布、均匀分布、正态分布
@@ -349,7 +358,7 @@ def get_task_sequence_by_type(episodes=10, means_tasks=20, dist_type='uniform'):
     :param sigma: 正态分布标准差
     :return: all_task_types, total_nums
     """
-    sigma = 0.15 * means_tasks  # 正态分布的标准差
+    sigma = int(0.15 * means_tasks)  # 正态分布的标准差
     np.random.seed(42)  # 设置随机种子确保结果可复现
     all_task_types = []
     match dist_type:
@@ -358,11 +367,13 @@ def get_task_sequence_by_type(episodes=10, means_tasks=20, dist_type='uniform'):
         case 'poisson':
             tasks_nums = np.random.poisson(lam=means_tasks, size=episodes)
         case 'normal':
-            tasks_nums = generate_normal_tasks(mean_tasks, sigma, episodes)
+            tasks_nums = generate_normal_tasks(means_tasks, sigma, episodes)
     total_nums = sum(tasks_nums)
+    print(tasks_nums)
 
     for task_num in tasks_nums:
         # 均匀分配任务类型
+        task_num = int(task_num)
         if task_num == 0:
             task_types = []
         else:
@@ -378,24 +389,15 @@ def get_task_sequence_by_type(episodes=10, means_tasks=20, dist_type='uniform'):
         all_task_types.append(task_types)
     return all_task_types, total_nums
 
+# get_task_sequence_by_type(episodes=30, means_tasks=20,dist_type='poisson')
+# get_task_sequence_by_type(episodes=30, means_tasks=20,dist_type='normal')
+
 # 示例用法
-# 均匀分布
-# print(np.random.poisson(5,100))
-# print(np.random.normal(10, 2))
 # np.random.seed(42)  # 设置随机种子确保结果可复现
 # mean_tasks = 8     # 平均任务数量（与泊松分布示例一致）
 # std_dev = 6        # 标准差（控制任务数量的波动程度）
 # time_points = 10   # 时间点数量
-#
-# # 生成符合正态分布的任务数量（处理负值问题）
-# def generate_normal_tasks(mean, std, size):
-#     tasks = np.random.normal(loc=mean, scale=std, size=size)
-#     # 将负数转换为0（任务数量不能为负）
-#     tasks[tasks < 0] = 0
-#     # 四舍五入到最接近的整数
-#     tasks = np.round(tasks).astype(int)
-#     return tasks
-#
+
 # # 生成任务数量序列
 # tasks = generate_normal_tasks(mean_tasks, std_dev, time_points)
 # print(tasks)
