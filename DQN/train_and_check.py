@@ -10,9 +10,9 @@ from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYP
 # 超参数
 EPSILON = 0.2
 EPSILON_DECAY = 0.995
-MIN_EPSILON = 0.1 # 0.001
+MIN_EPSILON = 0.001
 EPISODES = 5000
-MAX_STEPS = 1024 * 2
+MAX_STEPS = 1024
 
 #环境初始化的时候 加东西
 
@@ -153,8 +153,11 @@ def train_test():
     print("模型已保存到", file_path)
 
 
-def get_task_sequence(max_tasks=20):
-    task_types = [random.randint(0, NUM_TASK_TYPES - 1) for _ in range(random.randint(1, max_tasks))]
+def get_task_sequence(max_tasks=20,type_="max"):
+    if type_ =="random":
+        task_types = [random.randint(0, NUM_TASK_TYPES - 1) for _ in range(random.randint(1, max_tasks))]
+    else:
+        task_types = [random.randint(0, NUM_TASK_TYPES - 1) for _ in range(max_tasks)]
     return task_types
 
 def train_batch_task():
@@ -171,7 +174,16 @@ def train_batch_task():
     for episode in range(EPISODES):
         env.reset()
         # train_init_state(env, episode)
-        task_types = get_task_sequence(70)
+        if episode <= 1500:
+            max_task_nums = 40
+            type_ = "max"
+        elif episode <= 3000:
+            max_task_nums = 60
+            type_ = "max"
+        elif episode <= 5000:
+            max_task_nums = 90
+            type_ = "random"
+        task_types = get_task_sequence(max_task_nums,type_)
         episode_reward = 0
         for step in range(MAX_STEPS):
             states, actions, rewards, next_states, dones = env.step_training_batch(task_types,agent)
@@ -185,14 +197,15 @@ def train_batch_task():
                 print(f"当前状态: {next_states[len(task_types)-1]},当前实体机负载: {pm_loads}")
             # 更新状态
             episode_reward += sum(rewards)/len(rewards)
-            task_types = get_task_sequence(70)
+            task_types = get_task_sequence(max_task_nums,type_)
 
             # 训练网络
             agent.train()
 
         # 减少 epsilon
         # 因为随着训练的进行，智能体会越来越依赖于学习到的策略，而不是随机选择动作 但我的训练状态策略会不会被有所影响 就没有机会去选择其他的动作了
-        agent.epsilon = max(MIN_EPSILON, agent.epsilon * EPSILON_DECAY)
+        if episode >= 4000:
+            agent.epsilon = max(MIN_EPSILON, agent.epsilon * EPSILON_DECAY)
 
         # 更新目标网络
         if episode % TARGET_UPDATE_FREQ == 0:
@@ -228,6 +241,6 @@ def train_batch_task():
     print("模型已保存到", file_path)
 
 
-# train_test()
-train_batch_task()
+train_test()
+# train_batch_task()
 # print(generate_random_state(1,21))  # 测试生成随机状态函数
