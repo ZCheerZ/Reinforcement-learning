@@ -20,13 +20,13 @@ overload = 50000
 
 # 环境参数
 NUM_TASK_TYPES = 7  # 应用类型数量
-NUM_VMS_PER_TYPE = [2,2,3,4,2,4,3]  # 每种应用类型有多少台虚拟机 VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3]
+NUM_VMS_PER_TYPE = [2,2,3,4,2,4,4]  # 每种应用类型有多少台虚拟机 VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3]
 VMS_PER_TYPE = [] # 每台虚拟机到应用类型的映射
 for i in range(NUM_TASK_TYPES):
     for j in range(NUM_VMS_PER_TYPE[i]):
         VMS_PER_TYPE.append(i)
 # print("VMS_PER_TYPE:", VMS_PER_TYPE)
-NUM_PM = 7  # 实体机数量
+NUM_PM = 3  # 实体机数量
 TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为了使得离散值都能覆盖到 训练的时候可以把duration拉长以覆盖更多，实际用的时候用实际值
     0: {"demand": 1, "duration": 5},  # 应用类型0: cpu需求量1%，持续80步长
     1: {"demand": 2, "duration": 5},  # 应用类型1: cpu需求量2%，持续70步长
@@ -38,7 +38,7 @@ TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为�
     7: {"demand": 9, "duration": 5},  # 应用类型7:
 }
 VM_CAPACITY = [100,120,150,150,150,150,150]  # 虚拟机容量，执行不同应用类型任务的虚拟机资源容量
-PM_CAPACITY = 300  # 实体机容量（300%）
+PM_CAPACITY = 1000  # 实体机容量（1000%）
 
 def env_params_reset(num_pm=None, num_task_types=None, num_vms_per_type=None, task_config=None, vm_capacity=None, pm_capacity=None):
     """
@@ -415,6 +415,7 @@ class CloudEnv:
                 # 如果所有同类型虚拟机都超载，则该任务不分配
                 if not allocated:
                     overload_nums += 1
+                # overload_nums += 1
 
    
         pm_loads,pm_utilization, pm_var = self.get_pm_info()  # 获取实体机负载信息

@@ -82,7 +82,7 @@ def get_task_sequence_by_type(episodes=10, means_tasks=20, dist_type='random'):
     :return: all_task_types, total_nums
     """
     sigma = int(0.15 * means_tasks)  # 正态分布的标准差
-    np.random.seed(42)  # 设置随机种子确保结果可复现
+    # np.random.seed(42)  # 设置随机种子确保结果可复现
     all_task_types = []
     match dist_type:
         case 'uniform':
@@ -317,7 +317,7 @@ def comparison_():
     # 1. 生成所有任务序列（每一轮的任务类型序列）
     # all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=140)
     # 2234 means_tasks = 55 244 means_tasks = 70
-    all_task_types,total_nums = get_task_sequence_by_type(episodes=T, means_tasks=90, dist_type='poisson')
+    all_task_types,total_nums = get_task_sequence_by_type(episodes=T, means_tasks=130, dist_type='poisson')
 
     # all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt")
     # print("生成的第一轮任务序列：", all_task_types)

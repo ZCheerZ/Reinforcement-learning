@@ -71,7 +71,7 @@ def train_test():
     agent = DQNAgent(state_dim, action_dim)
     # 记录每个回合的总奖励
     rewards_history = []
-    tracked_state = (3, 9, 14, 4, 16, 16, 8, 15, 3, 21, 8, 20, 5, 20, 8, 14, 4, 8, 7, 17, 10)#(0, 7, 8, 6, 3, 15, 8, 18, 9, 6, 7, 7)
+    tracked_state = (3, 9, 14, 4, 16, 16, 8, 15, 3, 21, 8, 20, 5, 20, 8, 14, 4, 8, 7, 17, 10, 1)#(0, 7, 8, 6, 3, 15, 8, 18, 9, 6, 7, 7)
     tracked_state = np.array(tracked_state, dtype=np.float32)
 
 
@@ -155,7 +155,7 @@ def train_test():
 
 def get_task_sequence(max_tasks=20,type_="max"):
     if type_ =="random":
-        task_types = [random.randint(0, NUM_TASK_TYPES - 1) for _ in range(random.randint(1, max_tasks))]
+        task_types = [random.randint(0, NUM_TASK_TYPES - 1) for _ in range(random.randint(max_tasks//2, max_tasks))]
     else:
         task_types = [random.randint(0, NUM_TASK_TYPES - 1) for _ in range(max_tasks)]
     return task_types
@@ -167,22 +167,22 @@ def train_batch_task():
     agent = DQNAgent(state_dim, action_dim)
     # 记录每个回合的总奖励
     rewards_history = []
-    tracked_state = (3, 9, 14, 4, 16, 16, 8, 15, 3, 21, 8, 20, 5, 20, 8, 14, 4, 8, 7, 17, 10)  # (0, 7, 8, 6, 3, 15, 8, 18, 9, 6, 7, 7)
+    tracked_state = (3, 9, 14, 4, 16, 16, 8, 15, 3, 21, 8, 20, 5, 20, 8, 14, 4, 8, 7, 17, 10,1)  # (0, 7, 8, 6, 3, 15, 8, 18, 9, 6, 7, 7)
     tracked_state = np.array(tracked_state, dtype=np.float32)
 
     # 训练循环
     for episode in range(EPISODES):
         env.reset()
         # train_init_state(env, episode)
-        if episode <= 1500:
-            max_task_nums = 40
-            type_ = "max"
-        elif episode <= 3000:
+        if episode <= 2500:
             max_task_nums = 60
-            type_ = "max"
+            type_ = "random"
         elif episode <= 5000:
             max_task_nums = 90
             type_ = "random"
+        # elif episode <= 5000:
+        #     max_task_nums = 120
+        #     type_ = "random"
         task_types = get_task_sequence(max_task_nums,type_)
         episode_reward = 0
         for step in range(MAX_STEPS):
@@ -241,6 +241,6 @@ def train_batch_task():
     print("模型已保存到", file_path)
 
 
-train_test()
-# train_batch_task()
+# train_test()
+train_batch_task()
 # print(generate_random_state(1,21))  # 测试生成随机状态函数
