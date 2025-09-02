@@ -18,9 +18,11 @@ a = 0.4
 b = 0.5
 overload = 50000
 
+# 需要解决的问题就是为什么会出现正值 找一下根因！
+
 # 环境参数
-NUM_TASK_TYPES = 7  # 应用类型数量
-NUM_VMS_PER_TYPE = [2,2,3,4,2,4,4]  # 每种应用类型有多少台虚拟机 VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3]
+NUM_TASK_TYPES = 3  # 应用类型数量
+NUM_VMS_PER_TYPE = [4,3,4]  # 每种应用类型有多少台虚拟机 VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3]
 VMS_PER_TYPE = [] # 每台虚拟机到应用类型的映射
 for i in range(NUM_TASK_TYPES):
     for j in range(NUM_VMS_PER_TYPE[i]):
@@ -28,17 +30,18 @@ for i in range(NUM_TASK_TYPES):
 # print("VMS_PER_TYPE:", VMS_PER_TYPE)
 NUM_PM = 3  # 实体机数量
 TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为了使得离散值都能覆盖到 训练的时候可以把duration拉长以覆盖更多，实际用的时候用实际值
-    0: {"demand": 1, "duration": 5},  # 应用类型0: cpu需求量1%，持续80步长
-    1: {"demand": 2, "duration": 5},  # 应用类型1: cpu需求量2%，持续70步长
-    2: {"demand": 3, "duration": 5},  # 应用类型2: cpu需求量3%，持续60步长
+    0: {"demand": 5, "duration": 5},  # 应用类型0: cpu需求量1%，持续80步长
+    1: {"demand": 8, "duration": 5},  # 应用类型1: cpu需求量2%，持续70步长
+    2: {"demand": 10, "duration": 5},  # 应用类型2: cpu需求量3%，持续60步长
     3: {"demand": 5, "duration": 5},  # 应用类型3: cpu需求量5%，持续50步长
     4: {"demand": 3, "duration": 5},  # 应用类型4: cpu需求量5%，持续40步长
     5: {"demand": 4, "duration": 5},  # 应用类型5: cpu需求量5%，持续60步长
     6: {"demand": 5, "duration": 5},  # 应用类型6: cpu需求量5%，持续40步长
     7: {"demand": 9, "duration": 5},  # 应用类型7:
 }
-VM_CAPACITY = [100,120,150,150,150,150,150]  # 虚拟机容量，执行不同应用类型任务的虚拟机资源容量
-PM_CAPACITY = 1000  # 实体机容量（1000%）
+VM_CAPACITY = [100,70,80,150,150,150,150]  # 虚拟机容量，执行不同应用类型任务的虚拟机资源容量
+PM_CAPACITY = 300  # 实体机容量（1000%）
+
 
 def env_params_reset(num_pm=None, num_task_types=None, num_vms_per_type=None, task_config=None, vm_capacity=None, pm_capacity=None):
     """
@@ -104,11 +107,12 @@ class CloudEnv:
     def _get_vm_level(self, load, vm_type):
         rate = load / VM_CAPACITY[vm_type] *100  # 获取对应虚拟机的容量比率
         # 将负载百分比转换为离散等级（1/2/3.../10）
-        level = int(rate) + 1
-        if level < 1:
-            level = 1
-        elif level > 100:
-            level = 100
+        gap  = 1
+        level = int(rate // gap)
+        if level <= 0:
+            level = 0
+        elif level > 100 // gap:
+            level = 100 // gap
         return level
         # if rate < 10:
         #     return 1
@@ -152,18 +156,25 @@ class CloudEnv:
                 all_states.append(state)
         return all_states
 
-    def generate_random_state(self,low, up):
+    def generate_random_state(self,low, up):  # 到时候直接加到虚拟机的负载load里面
         """
         基于NUM_VMS_PER_TYPE随机生成一个状态
         返回格式: (task_type, vm_level_0, vm_level_1, ..., vm_level_n)
         """
         # 随机生成任务类型
+        gap  = 1
         task_type = random.randint(0, NUM_TASK_TYPES - 1)
         # 随机生成每台虚拟机的等级
         state = [task_type]
+        random_level = []
+        for type in range(NUM_TASK_TYPES):
+            multiples = [int(i / VM_CAPACITY[VMS_PER_TYPE[type]] *100 // gap)
+            for i in range(low, up + 1) if i % TASK_CONFIG[type]["demand"] == 0]
+            random_level.append(multiples)
+
         for i in range(len(VMS_PER_TYPE)):
             # 随机生成虚拟机负载等级（1-100级，对应0-100%负载）
-            vm_level = random.randint(low, up)
+            vm_level = random.choice(random_level[VMS_PER_TYPE[i]])
             state.append(vm_level)
         return tuple(state)
 
@@ -177,8 +188,9 @@ class CloudEnv:
             # 反推负载百分比区间的均值
             vm_type = VMS_PER_TYPE[i]
             level = state[i + 1]
+            gap  = 1
             # 反推百分比区间的中值  percent = (level * 区间宽度 - 区间宽度/2) 除了1之外
-            self.vm_load[i] = (level * 1) / 100 * VM_CAPACITY[vm_type]
+            self.vm_load[i] = (level * gap) / 100 * VM_CAPACITY[vm_type]
         # 清空任务队列（注意：此处未恢复任务队列，仅用于Q表学习）
         for q in self.task_queues:
             q.clear()

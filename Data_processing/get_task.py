@@ -55,7 +55,7 @@ def process_task_arrivals(file_path, target_task_type, start_timestamp, slot_dur
 if __name__ == "__main__":
     # ===== 用户需要配置的参数 =====
     csv_file = "Data_processing\\original_data\\part-00000-of-00500.csv\\part-00000-of-00500.csv"  # CSV文件路径
-    task_type = 515042969  # 目标任务类型ID 515042969 6218406404   6251537638
+    task_type = 6218406404  # 目标任务类型ID 515042969 6218406404   6251537638
     period_start = 600000000  # 周期起始时间戳(微秒)
     slot_duration=5000000
     num_slots=1000
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     print(f"任务到达序列({num_slots}个时隙):")
     print(arrival_counts)
     # 写文件
-    with open("Prediction\\task.txt", 'w') as file:
+    with open("Prediction\\task2.txt", 'w') as file:
         # 遍历数组中的每个元素，并将它们写入文件，每个元素后面跟一个换行符
         for element in arrival_counts:
             file.write(str("{:.1f}".format(element)) + '\n')

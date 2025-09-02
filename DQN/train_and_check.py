@@ -71,7 +71,7 @@ def train_test():
     agent = DQNAgent(state_dim, action_dim)
     # 记录每个回合的总奖励
     rewards_history = []
-    tracked_state = (3, 9, 14, 4, 16, 16, 8, 15, 3, 21, 8, 20, 5, 20, 8, 14, 4, 8, 7, 17, 10, 1)#(0, 7, 8, 6, 3, 15, 8, 18, 9, 6, 7, 7)
+    tracked_state = (0, 7, 8, 6, 3, 15, 8, 18, 9, 6, 7, 7) #(3, 9, 14, 4, 16, 16, 8, 15, 3, 21, 8, 20, 5, 20, 8, 14, 4, 8, 7, 17, 10, 1)
     tracked_state = np.array(tracked_state, dtype=np.float32)
 
 
@@ -167,7 +167,7 @@ def train_batch_task():
     agent = DQNAgent(state_dim, action_dim)
     # 记录每个回合的总奖励
     rewards_history = []
-    tracked_state = (3, 9, 14, 4, 16, 16, 8, 15, 3, 21, 8, 20, 5, 20, 8, 14, 4, 8, 7, 17, 10,1)  # (0, 7, 8, 6, 3, 15, 8, 18, 9, 6, 7, 7)
+    tracked_state = (0, 7, 8, 6, 3, 15, 8, 18, 9, 6, 7, 7) # (3, 9, 14, 4, 16, 16, 8, 15, 3, 21, 8, 20, 5, 20, 8, 14, 4, 8, 7, 17, 10,1) 
     tracked_state = np.array(tracked_state, dtype=np.float32)
 
     # 训练循环
@@ -175,10 +175,10 @@ def train_batch_task():
         env.reset()
         # train_init_state(env, episode)
         if episode <= 2500:
-            max_task_nums = 60
+            max_task_nums = 10
             type_ = "random"
         elif episode <= 5000:
-            max_task_nums = 90
+            max_task_nums = 20
             type_ = "random"
         # elif episode <= 5000:
         #     max_task_nums = 120

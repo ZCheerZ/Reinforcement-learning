@@ -317,7 +317,7 @@ def comparison_():
     # 1. 生成所有任务序列（每一轮的任务类型序列）
     # all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=140)
     # 2234 means_tasks = 55 244 means_tasks = 70
-    all_task_types,total_nums = get_task_sequence_by_type(episodes=T, means_tasks=130, dist_type='poisson')
+    all_task_types,total_nums = get_task_sequence_by_type(episodes=T, means_tasks=10, dist_type='poisson')
 
     # all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt")
     # print("生成的第一轮任务序列：", all_task_types)
