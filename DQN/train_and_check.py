@@ -11,10 +11,19 @@ from model_definition import CloudEnv, DQNAgent, NUM_TASK_TYPES, NUM_VMS_PER_TYP
 EPSILON = 0.2
 EPSILON_DECAY = 0.995
 MIN_EPSILON = 0.001
-EPISODES = 5000
-MAX_STEPS = 1024
+EPISODES = 3000
+MAX_STEPS = 512
 
 #环境初始化的时候 加东西
+
+def update_epsilon(agent, episode, total_episodes):
+    # 前30%轮保持高探索，后70%线性衰减
+    ratio = episode / total_episodes
+    if ratio < 0.3:
+        agent.epsilon = 0.2
+    else:
+        min_epsilon = 0.01
+        agent.epsilon = max(min_epsilon, 0.2 - (ratio - 0.3) / 0.7 * (0.2 - min_epsilon))
 
 def generate_state(vm_level):
     task_type = random.randint(0, NUM_TASK_TYPES - 1)
@@ -123,7 +132,7 @@ def train_test():
 
         # if episode % 500 == 0:
         print(f"Episode {episode}, Avg Reward: {episode_reward:.2f}")
-        print(f"追踪动作值分布: {agent.policy_net(torch.FloatTensor(tracked_state).unsqueeze(0))}")
+        # print(f"追踪动作值分布: {agent.policy_net(torch.FloatTensor(tracked_state).unsqueeze(0))}")
 
 
         rewards_history.append(episode_reward)
@@ -174,15 +183,15 @@ def train_batch_task():
     for episode in range(EPISODES):
         env.reset()
         # train_init_state(env, episode)
-        if episode <= 2500:
+        if episode <= 1500:
             max_task_nums = 10
             type_ = "random"
-        elif episode <= 5000:
+        elif episode <= 3000:
             max_task_nums = 20
             type_ = "random"
-        # elif episode <= 5000:
-        #     max_task_nums = 120
-        #     type_ = "random"
+        elif episode <= 7000:
+            max_task_nums = 15
+            type_ = "random"
         task_types = get_task_sequence(max_task_nums,type_)
         episode_reward = 0
         for step in range(MAX_STEPS):
@@ -204,8 +213,9 @@ def train_batch_task():
 
         # 减少 epsilon
         # 因为随着训练的进行，智能体会越来越依赖于学习到的策略，而不是随机选择动作 但我的训练状态策略会不会被有所影响 就没有机会去选择其他的动作了
-        if episode >= 4000:
-            agent.epsilon = max(MIN_EPSILON, agent.epsilon * EPSILON_DECAY)
+        # if episode >= 4000:
+        #     agent.epsilon = max(MIN_EPSILON, agent.epsilon * EPSILON_DECAY)
+        update_epsilon(agent, episode, EPISODES)
 
         # 更新目标网络
         if episode % TARGET_UPDATE_FREQ == 0:
@@ -213,7 +223,7 @@ def train_batch_task():
 
         # if episode % 500 == 0:
         print(f"Episode {episode}, Avg Reward: {episode_reward:.2f}")
-        print(f"追踪动作值分布: {agent.policy_net(torch.FloatTensor(tracked_state).unsqueeze(0))}")
+        # print(f"追踪动作值分布: {agent.policy_net(torch.FloatTensor(tracked_state).unsqueeze(0))}")
 
         rewards_history.append(episode_reward)
 

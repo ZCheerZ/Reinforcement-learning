@@ -10,36 +10,36 @@ os.environ['KMP_DUPLICATE_LIB_OK']='TRUE'
 # 超参数
 LEARNING_RATE = 0.001
 DISCOUNT_FACTOR = 0.6
-BATCH_SIZE = 64
+BATCH_SIZE = 64 * 4
 MEMORY_SIZE = 50000
 TARGET_UPDATE_FREQ = 100
-EPSILON = 0.2 # 探索率
+EPSILON = 0.25 # 探索率
 a = 0.4 
 b = 0.5
-overload = 50000
+overload = 10000000
 
 # 需要解决的问题就是为什么会出现正值 找一下根因！
 
 # 环境参数
-NUM_TASK_TYPES = 3  # 应用类型数量
-NUM_VMS_PER_TYPE = [4,3,4]  # 每种应用类型有多少台虚拟机 VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3]
+NUM_TASK_TYPES = 7  # 应用类型数量
+NUM_VMS_PER_TYPE = [2,2,3,4,2,4,3]  # 每种应用类型有多少台虚拟机 VMS_PER_TYPE = [0,0,1,1,1,1,2,2,3,3,3]
 VMS_PER_TYPE = [] # 每台虚拟机到应用类型的映射
 for i in range(NUM_TASK_TYPES):
     for j in range(NUM_VMS_PER_TYPE[i]):
         VMS_PER_TYPE.append(i)
 # print("VMS_PER_TYPE:", VMS_PER_TYPE)
-NUM_PM = 3  # 实体机数量
+NUM_PM = 7  # 实体机数量
 TASK_CONFIG = {  # 不同应用类型的任务预定义参数  需求10%是为了使得离散值都能覆盖到 训练的时候可以把duration拉长以覆盖更多，实际用的时候用实际值
-    0: {"demand": 5, "duration": 5},  # 应用类型0: cpu需求量1%，持续80步长
-    1: {"demand": 8, "duration": 5},  # 应用类型1: cpu需求量2%，持续70步长
-    2: {"demand": 10, "duration": 5},  # 应用类型2: cpu需求量3%，持续60步长
+    0: {"demand": 1, "duration": 5},  # 应用类型0: cpu需求量1%，持续80步长
+    1: {"demand": 2, "duration": 5},  # 应用类型1: cpu需求量2%，持续70步长
+    2: {"demand": 3, "duration": 5},  # 应用类型2: cpu需求量3%，持续60步长
     3: {"demand": 5, "duration": 5},  # 应用类型3: cpu需求量5%，持续50步长
     4: {"demand": 3, "duration": 5},  # 应用类型4: cpu需求量5%，持续40步长
     5: {"demand": 4, "duration": 5},  # 应用类型5: cpu需求量5%，持续60步长
     6: {"demand": 5, "duration": 5},  # 应用类型6: cpu需求量5%，持续40步长
     7: {"demand": 9, "duration": 5},  # 应用类型7:
 }
-VM_CAPACITY = [100,70,80,150,150,150,150]  # 虚拟机容量，执行不同应用类型任务的虚拟机资源容量
+VM_CAPACITY = [100, 120, 150 ,150 ,150 ,150 ,150]  # 虚拟机容量，执行不同应用类型任务的虚拟机资源容量
 PM_CAPACITY = 300  # 实体机容量（1000%）
 
 
@@ -103,6 +103,8 @@ class CloudEnv:
         self.prefix_NUM_VMS_PER_TYPE = prefix_sum(NUM_VMS_PER_TYPE)
         # 初始化轮询指针
         self.rr_pointer = [0 for _ in range(NUM_TASK_TYPES)]
+
+        self.reward_history = []
         
     def _get_vm_level(self, load, vm_type):
         rate = load / VM_CAPACITY[vm_type] *100  # 获取对应虚拟机的容量比率
@@ -156,6 +158,14 @@ class CloudEnv:
                 all_states.append(state)
         return all_states
 
+    def normalize_reward(self, reward):
+        self.reward_history.append(reward)
+        if len(self.reward_history) < 100:
+            return reward  # 前期不归一化
+        mean = np.mean(self.reward_history[-100:])
+        std = np.std(self.reward_history[-100:]) + 1e-6
+        return (reward - mean) / std
+
     def generate_random_state(self,low, up):  # 到时候直接加到虚拟机的负载load里面
         """
         基于NUM_VMS_PER_TYPE随机生成一个状态
@@ -190,63 +200,63 @@ class CloudEnv:
             level = state[i + 1]
             gap  = 1
             # 反推百分比区间的中值  percent = (level * 区间宽度 - 区间宽度/2) 除了1之外
-            self.vm_load[i] = (level * gap) / 100 * VM_CAPACITY[vm_type]
+            self.vm_load[i] = (level * gap - gap//2) / 100 * VM_CAPACITY[vm_type]
         # 清空任务队列（注意：此处未恢复任务队列，仅用于Q表学习）
         for q in self.task_queues:
             q.clear()
     
-    def step(self, task_type, vm_id): 
-        #  DQN学习过程中使用的step，将每个任务分配到指定虚拟机，并计算奖励
-        #  执行动作：分配任务到虚拟机，并处理任务队列
-        #  处理任务队列（减少剩余步长）
-        released_load = 0
-        for vm in range(len(VMS_PER_TYPE)):  # sum(NUM_VMS_PER_TYPE)
-            new_queue = deque()
-            while self.task_queues[vm]:
-                remain_steps, load = self.task_queues[vm].popleft()
-                remain_steps -= 1
-                if remain_steps > 0:
-                    new_queue.append((remain_steps, load))
-                else:  # 任务完成，释放负载
-                    self.vm_load[vm] -= load
-                    released_load += load
-            self.task_queues[vm] = new_queue
-        
-        #添加新任务到队列
-        task_demand = TASK_CONFIG[task_type]["demand"]
-        task_duration = TASK_CONFIG[task_type]["duration"]
-        
-        # 检查虚拟机容量是否足够
-        if self.vm_load[vm_id] + task_demand > VM_CAPACITY[VMS_PER_TYPE[vm_id]]:
-            reward = -1 * overload  # 直接拒绝任务的惩罚
-            return reward, False
-        
-        # 更新虚拟机负载
-        self.vm_load[vm_id] += task_demand
-        self.task_queues[vm_id].append((task_duration, task_demand))
-
-        # 计算奖励
-        # 同类型虚拟机的负载方差
-        same_type_vms = [self.vm_load[i] for i in range(len(VMS_PER_TYPE)) 
-                       if VMS_PER_TYPE[i] == task_type]
-        vm_var = np.var(same_type_vms)
-        
-        # 实体机负载方差
-        entity_loads = []
-        for e in range(NUM_PM):  # 实体机数量
-            load = sum(
-                self.vm_load[i] 
-                for i in range(len(VMS_PER_TYPE))  # sum(NUM_VMS_PER_TYPE)
-                if self.vm_to_pm[i] == e
-            )
-            entity_loads.append(load)
-        entity_var = np.var(entity_loads)
-        
-        # 过载惩罚（任一实体机超载）
-        overload_penalty = overload if any(l > PM_CAPACITY for l in entity_loads) else 0
-        
-        reward = -a * vm_var - b * entity_var - overload_penalty
-        return reward, False
+    # def step(self, task_type, vm_id):
+    #     #  DQN学习过程中使用的step，将每个任务分配到指定虚拟机，并计算奖励
+    #     #  执行动作：分配任务到虚拟机，并处理任务队列
+    #     #  处理任务队列（减少剩余步长）
+    #     released_load = 0
+    #     for vm in range(len(VMS_PER_TYPE)):  # sum(NUM_VMS_PER_TYPE)
+    #         new_queue = deque()
+    #         while self.task_queues[vm]:
+    #             remain_steps, load = self.task_queues[vm].popleft()
+    #             remain_steps -= 1
+    #             if remain_steps > 0:
+    #                 new_queue.append((remain_steps, load))
+    #             else:  # 任务完成，释放负载
+    #                 self.vm_load[vm] -= load
+    #                 released_load += load
+    #         self.task_queues[vm] = new_queue
+    #
+    #     #添加新任务到队列
+    #     task_demand = TASK_CONFIG[task_type]["demand"]
+    #     task_duration = TASK_CONFIG[task_type]["duration"]
+    #
+    #     # 检查虚拟机容量是否足够
+    #     if self.vm_load[vm_id] + task_demand > VM_CAPACITY[VMS_PER_TYPE[vm_id]]:
+    #         reward = -1 * overload  # 直接拒绝任务的惩罚
+    #         return reward, False
+    #
+    #     # 更新虚拟机负载
+    #     self.vm_load[vm_id] += task_demand
+    #     self.task_queues[vm_id].append((task_duration, task_demand))
+    #
+    #     # 计算奖励
+    #     # 同类型虚拟机的负载方差
+    #     same_type_vms = [self.vm_load[i] for i in range(len(VMS_PER_TYPE))
+    #                    if VMS_PER_TYPE[i] == task_type]
+    #     vm_var = np.var(same_type_vms)
+    #
+    #     # 实体机负载方差
+    #     entity_loads = []
+    #     for e in range(NUM_PM):  # 实体机数量
+    #         load = sum(
+    #             self.vm_load[i]
+    #             for i in range(len(VMS_PER_TYPE))  # sum(NUM_VMS_PER_TYPE)
+    #             if self.vm_to_pm[i] == e
+    #         )
+    #         entity_loads.append(load)
+    #     entity_var = np.var(entity_loads)
+    #
+    #     # 过载惩罚（任一实体机超载）
+    #     overload_penalty = overload if any(l > PM_CAPACITY for l in entity_loads) else 0
+    #
+    #     reward = -a * vm_var - b * entity_var - overload_penalty
+    #     return reward, False
     
     def step_training(self, task_type ,agent): 
         #  DQN学习过程中使用的step，将每个任务分配到指定虚拟机，并计算奖励
@@ -358,7 +368,8 @@ class CloudEnv:
             same_type_vms = [self.vm_load[i] for i in range(len(VMS_PER_TYPE))
                              if VMS_PER_TYPE[i] == task_type]
             vm_var = np.var(same_type_vms)
-            reward = -a * vm_var - b * pm_var
+            reward = -a * vm_var # - b * pm_var
+            reward = self.normalize_reward(reward)
             rewards.append(reward)
         return states, actions, rewards, next_states, dones
     
@@ -397,12 +408,18 @@ class CloudEnv:
             if(choose_function == "DQN"):
                 action = agent.choose_action_multi(test_state,0)
             elif(choose_function == "RR"):
-                available_actions = list(range(NUM_VMS_PER_TYPE[task_type]))
+                # available_actions = list(range(NUM_VMS_PER_TYPE[task_type]))
                 action = self.rr_pointer[task_type]
                 self.rr_pointer[task_type] = (self.rr_pointer[task_type] + 1) % NUM_VMS_PER_TYPE[task_type]
             elif(choose_function == "Random"):
                 available_actions = list(range(NUM_VMS_PER_TYPE[task_type]))
                 action = random.choice(available_actions)
+            elif choose_function == "MinMin":
+                # Min-Min 策略：选择当前负载最小的虚拟机
+                start = self.prefix_NUM_VMS_PER_TYPE[task_type]
+                end = self.prefix_NUM_VMS_PER_TYPE[task_type + 1]
+                candidate_vms = list(range(start, end))
+                action = np.argmin([self.vm_load[vm_id] for vm_id in candidate_vms])
 
 
             vm_id = self.prefix_NUM_VMS_PER_TYPE[task_type] + action  # 获取全局虚拟机ID
@@ -425,9 +442,9 @@ class CloudEnv:
                         # print(f"Task type {task_type} allocated to VM {alt_vm} instead of overloaded VM {vm_id}.")
                         break
                 # 如果所有同类型虚拟机都超载，则该任务不分配
-                if not allocated:
-                    overload_nums += 1
-                # overload_nums += 1
+                # if not allocated:
+                #     overload_nums += 1
+                overload_nums += 1
 
    
         pm_loads,pm_utilization, pm_var = self.get_pm_info()  # 获取实体机负载信息

@@ -316,8 +316,8 @@ def comparison_():
     T = 1000
     # 1. 生成所有任务序列（每一轮的任务类型序列）
     # all_task_types,total_nums = get_task_sequence(episodes=T, max_tasks=140)
-    # 2234 means_tasks = 55 244 means_tasks = 70
-    all_task_types,total_nums = get_task_sequence_by_type(episodes=T, means_tasks=10, dist_type='poisson')
+    # 2234 means_tasks = 55 244 means_tasks = 70  2234243 means_tasks = 70(good)
+    all_task_types,total_nums = get_task_sequence_by_type(episodes=T, means_tasks=75, dist_type='poisson')
 
     # all_task_types, total_nums, T = get_task_sequence_from_file("DQN/task_sequence.txt")
     # print("生成的第一轮任务序列：", all_task_types)
@@ -325,10 +325,10 @@ def comparison_():
     num_vms_str = ''.join(str(x) for x in NUM_VMS_PER_TYPE)
     print("NUM_VMS_PER_TYPE字符串形式:", num_vms_str)
     # 保存模型
-    file_path = "DQN/model/policy_net(" + num_vms_str + ").pth"
+    file_path = "DQN/model/policy_net(" + num_vms_str + ")best.pth"
     agent = load_agent_from_file(file_path)
     vm_var_q, entity_var_q,vm__utilization_q,pm__utilization_q,overload_nums_q = evaluate_performance(all_task_types, choose_function="DQN", T=T, agent=agent)
-    # model_definition.env_params_reset(num_pm=5,num_vms_per_type=[5,4,4])  # 重置环境参数
+    model_definition.env_params_reset(num_pm=7,num_vms_per_type=[2,2,4,4,2,3,3])  # 重置环境参数
     vm_var_rr, entity_var_rr,vm__utilization_rr,pm__utilization_rr,overload_nums_rr = evaluate_performance(all_task_types, choose_function="RR", T=T, agent=None)
     # vm_var_random, entity_var_random,vm__utilization_random,pm__utilization_random,overload_nums_random = evaluate_performance(all_task_types, choose_function="Random", T=T, agent=None)
     # 计算每种类型虚拟机方差的均值
