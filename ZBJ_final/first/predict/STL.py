@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -84,68 +85,143 @@ class STLBaselinePredictor:
         future_dates = pd.date_range(start=last_date, periods=horizon+1, freq=freq)[1:]
         
         return pd.Series(baseline_forecast, index=future_dates)
+    
 
-# ==========================================
-# 模拟实验：验证对突发流量的忽略能力
-# ==========================================
+def Simulate_Data():
+    # ==========================================
+    # 模拟实验：验证对突发流量的忽略能力
+    # ==========================================
 
-# 1. 生成模拟数据 (Simulate Data)
-# 设定：14天数据，每小时一个点，周期为24
-np.random.seed(42)
-days = 14
-period = 24
-n_points = days * period
-time_index = pd.date_range(start='2024-01-01', periods=n_points, freq='H')
+    # 1. 生成模拟数据 (Simulate Data)
+    # 设定：14天数据，每小时一个点，周期为24
+    np.random.seed(42)
+    days = 14
+    period = 24
+    n_points = days * period
+    time_index = pd.date_range(start='2024-01-01', periods=n_points, freq='H')
 
-# 基础成分
-trend = np.linspace(50, 80, n_points) # 缓慢增长的趋势
-season = 10 * np.sin(2 * np.pi * np.arange(n_points) / period) # 周期性波动
+    # 基础成分
+    trend = np.linspace(50, 80, n_points) # 缓慢增长的趋势
+    season = 10 * np.sin(2 * np.pi * np.arange(n_points) / period) # 周期性波动
 
-# 突发噪音 (Bursts) - 这就是你要过滤的
-bursts = np.zeros(n_points)
-# 随机添加几个巨大的突发峰值
-burst_indices = np.random.choice(n_points, 10, replace=False)
-bursts[burst_indices] = np.random.randint(30, 60, 10) # 突发量很大
+    # 突发噪音 (Bursts) - 这就是你要过滤的
+    bursts = np.zeros(n_points)
+    # 随机添加几个巨大的突发峰值
+    burst_indices = np.random.choice(n_points, 10, replace=False)
+    bursts[burst_indices] = np.random.randint(30, 60, 10) # 突发量很大
 
-# 正常的白噪声
-noise = np.random.normal(0, 2, n_points)
+    # 正常的白噪声
+    noise = np.random.normal(0, 2, n_points)
 
-# 合成总数据
-data = trend + season + bursts + noise
-series = pd.Series(data, index=time_index)
+    # 合成总数据
+    data = trend + season + bursts + noise
+    series = pd.Series(data, index=time_index)
 
-# 2. 运行 STL 基线预测
-# 假设我们要预测未来 24 小时
-forecast_horizon = 24
+    # 2. 运行 STL 基线预测
+    # 假设我们要预测未来 24 小时
+    forecast_horizon = 24
 
-predictor = STLBaselinePredictor(period=period, robust=True)
-stl_result = predictor.fit(series)
-future_baseline = predictor.predict(forecast_horizon)
+    predictor = STLBaselinePredictor(period=period, robust=True)
+    stl_result = predictor.fit(series)
+    future_baseline = predictor.predict(forecast_horizon)
 
-# 3. 可视化结果
-plt.figure(figsize=(15, 8))
+    # 3. 可视化结果
+    plt.figure(figsize=(15, 8))
 
-# 绘制历史数据
-plt.plot(series.index[-100:], series.values[-100:], label='History (Real Data)', color='lightgray', linewidth=2)
-# 标记突发点
-burst_mask = bursts[-100:] > 0
-if np.any(burst_mask):
-    plt.scatter(series.index[-100:][burst_mask], series.values[-100:][burst_mask], color='red', label='Bursts (Ignored)', zorder=5)
+    # 绘制历史数据
+    plt.plot(series.index[-100:], series.values[-100:], label='History (Real Data)', color='lightgray', linewidth=2)
+    # 标记突发点
+    burst_mask = bursts[-100:] > 0
+    if np.any(burst_mask):
+        plt.scatter(series.index[-100:][burst_mask], series.values[-100:][burst_mask], color='red', label='Bursts (Ignored)', zorder=5)
 
-# 绘制 STL 提取的历史 Trend+Seasonal (验证拟合效果)
-history_baseline = predictor.history_trend + predictor.history_seasonal
-plt.plot(history_baseline.index[-100:], history_baseline.values[-100:], label='STL Fitted Baseline', color='blue', linestyle='--')
+    # 绘制 STL 提取的历史 Trend+Seasonal (验证拟合效果)
+    history_baseline = predictor.history_trend + predictor.history_seasonal
+    plt.plot(history_baseline.index[-100:], history_baseline.values[-100:], label='STL Fitted Baseline', color='blue', linestyle='--')
 
-# 绘制未来预测
-plt.plot(future_baseline.index, future_baseline.values, label='Future Baseline Prediction', color='green', linewidth=3)
+    # 绘制未来预测
+    plt.plot(future_baseline.index, future_baseline.values, label='Future Baseline Prediction', color='green', linewidth=3)
 
-plt.title(f"STL Robust Baseline Prediction (Ignoring Bursts)\nForecast Horizon: {forecast_horizon} Steps", fontsize=14)
-plt.xlabel("Time")
-plt.ylabel("Resource Demand")
-plt.legend()
-plt.grid(True, alpha=0.3)
-plt.show()
+    plt.title(f"STL Robust Baseline Prediction (Ignoring Bursts)\nForecast Horizon: {forecast_horizon} Steps", fontsize=14)
+    plt.xlabel("Time")
+    plt.ylabel("Resource Demand")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.show()
 
-# 打印分解组件查看
-# stl_result.plot()
-# plt.show()
+    # # 打印分解组件查看
+    # stl_result.plot()
+    # plt.show()
+
+def getFileData():
+    # 动态获取文件路径
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # 假设数据在这个相对路径: ../data/Original/0/output_cpu_avg.txt
+    file_path = os.path.join(current_dir, '..', 'data', 'Original', '0', 'output_cpu_avg.txt')
+    file_path = os.path.abspath(file_path)
+
+    if not os.path.exists(file_path):
+        print(f"Error: File not found at {file_path}")
+        return
+
+    print(f"Reading data from: {file_path}")
+    
+    # 读取数据
+    try:
+        # 假设txt文件只有一列数据
+        data = np.loadtxt(file_path)
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return
+
+    # 构造时间序列
+    # 假设由于没有时间戳，我们创建一个默认的小时级时间索引
+    period = 288 # 假设周期为288（例如每天288个5分钟间隔）
+    n_points = len(data)
+    # 使用 pd.date_range 生成时间索引，起始时间任意
+    time_index = pd.date_range(start='2024-01-01', periods=n_points, freq='5Min')
+    
+    series = pd.Series(data, index=time_index)
+    
+    # 运行 STL 基线预测
+    forecast_horizon = 288  # 预测未来288个点
+    
+    print("Fitting STL model...")
+    predictor = STLBaselinePredictor(period=period, robust=True)
+    stl_result = predictor.fit(series)
+    future_baseline = predictor.predict(forecast_horizon)
+
+    # 保存预测结果到 txt 文件
+    output_dir = os.path.dirname(file_path)
+    output_path = os.path.join(output_dir, '1_STL.txt')
+    np.savetxt(output_path, future_baseline.values, fmt='%.6f')
+    print(f"Prediction saved to: {output_path}")
+    
+    # 可视化结果
+    plt.figure(figsize=(15, 8))
+    
+    # 绘制历史数据 (显示最近的一段时间，例如最近14个周期的数据)
+    display_points = min(288 * 14, n_points)
+    plt.plot(series.index[-display_points:], series.values[-display_points:], label='History (Actual Data)', color='lightgray', linewidth=2)
+    
+    # 绘制 STL 拟合后的基线 (Trend + Seasonal)
+    history_baseline = predictor.history_trend + predictor.history_seasonal
+    plt.plot(history_baseline.index[-display_points:], history_baseline.values[-display_points:], label='STL Fitted Baseline', color='blue', linestyle='--')
+    
+    # 绘制未来预测
+    plt.plot(future_baseline.index, future_baseline.values, label='Future Baseline Prediction', color='green', linewidth=3)
+    
+    plt.title(f"STL Robust Baseline Prediction on Real Data\nFile: {os.path.basename(file_path)}", fontsize=14)
+    plt.xlabel("Time")
+    plt.ylabel("Value")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.show()
+
+    # 打印分解组件查看
+    stl_result.plot()
+    plt.show()
+
+if __name__ == "__main__":
+    # Simulate_Data()
+    getFileData()
